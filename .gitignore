@@ -13,5 +13,5 @@ wheels/
 /.idea/
 /logs/
 
-# 嵌入模型大文件（使用 Git LFS 单独推送）
-docker/embedding/bge-large-zh-v1.5/pytorch_model.bin
+# 嵌入模型文件（本地部署，不纳入版本控制）
+docker/embedding/
