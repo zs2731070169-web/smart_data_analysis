@@ -1,0 +1,17 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+/.jbeval/
+/.claude/
+/.idea/
+/logs/
+
+# 嵌入模型大文件（使用 Git LFS 单独推送）
+docker/embedding/bge-large-zh-v1.5/pytorch_model.bin
