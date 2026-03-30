@@ -29,8 +29,7 @@ class MetaMysqlRepository:
                         await session.execute(text(f"TRUNCATE TABLE {safe_table_name}"))
                         logger.info(f"已清空表 {table_name} 的数据")
         except Exception as e:
-            logger.error(f"清空原有元数据表数据失败: {e}")
-            raise
+            logger.warning(f"清空原有元数据表数据失败: {e}")
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
     async def batch_add_meta_records(self, meta_infos: List[Base], batch: int = 200):

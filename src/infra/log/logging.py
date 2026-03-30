@@ -31,7 +31,9 @@ logger = logger.patch(extract_init)
 if app_config.logging.console.enable: logger.add(sys.stdout, level=app_config.logging.console.level, format=log_format)
 # 日志文件输出配置
 if app_config.logging.file.enable:
-    path = Path(app_config.logging.file.path)
+    # 基于项目根目录解析日志路径，避免相对路径受工作目录影响
+    root_path = Path(__file__).parents[3]
+    path = root_path / app_config.logging.file.path
     path.mkdir(exist_ok=True, parents=True)
     logger.add(
         sink=path.joinpath(f"app_{datetime_format(any_datetime(), DATE_FORMAT)}.log"),

@@ -63,8 +63,6 @@ class ValueESRepository:
             await self.es_client.indices.delete(index=column_value_index)
             logger.info(f"已清空索引 {column_value_index}")
         except NotFoundError as e:
-            logger.error(f"索引 {column_value_index} 不存在，无法删除: {e}")
-            raise
+            logger.warning(f"索引 {column_value_index} 不存在，无法删除: {e}")
         except Exception as e:
-            logger.error(f"清空索引 {column_value_index} 失败: {e}")
-            raise
+            logger.warning(f"清空索引 {column_value_index} 失败: {e}")

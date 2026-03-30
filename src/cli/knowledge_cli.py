@@ -1,6 +1,9 @@
 import asyncio
+import uuid
+
 
 from infra.factory.repository_factory import repository_factory
+from infra.log import task_id_context
 from infra.log.logging import logger
 from service.knowledge_service import KnowledgeService
 from utils.args_utils import read_cli_args
@@ -12,6 +15,8 @@ async def run_cli():
     :return:
     """
     try:
+        # 每次运行生成一个新的任务id，方便日志追踪
+        task_id_context.set(uuid.uuid4().hex)
         # 读取控制台参数
         conf_path = read_cli_args()
         logger.info(f"从命令行接收参数: {conf_path}")

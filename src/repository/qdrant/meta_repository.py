@@ -56,5 +56,4 @@ class MetaQdrantRepository:
                 await self.qdrant_client.delete_collection(collection_name=collection)
                 logger.info(f"已清空集合 {collection}")
         except Exception as e:
-            logger.error(f"清空原有元数据集合失败: {e}")
-            raise
+            logger.warning(f"清空原有元数据集合失败: {e}")

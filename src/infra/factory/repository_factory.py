@@ -28,8 +28,6 @@ class RepositoryFactory:
         self._mysql = mysql_manager
         self._qdrant = qdrant_manager
         self._es = es_manager
-        self._dw_session = None
-        self._meta_session = None
 
     async def __aenter__(self) -> Repositories:
         # 初始化客户端
