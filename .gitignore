@@ -13,5 +13,4 @@ wheels/
 /.idea/
 /logs/
 
-# 嵌入模型文件（本地部署，不纳入版本控制）
-docker/embedding/
+/docker/

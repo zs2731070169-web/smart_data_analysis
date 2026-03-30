@@ -1,8 +1,0 @@
-server.host: "0.0.0.0"
-
-elasticsearch.hosts: ["http://elasticsearch:9200"]
-elasticsearch.serviceAccountToken: "AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYV90b2tlbjpNeGEzSFllcVNVQ3ZoLWpaM1ZVRWRn"
-
-xpack.security.encryptionKey: "a]3@kd94!ls2mFa0S5Hv7x6cY#rPz1eQ"
-xpack.encryptedSavedObjects.encryptionKey: "b]4@ke05!mt3nGb1T6Iw8y7dZ$sPa2fR"
-xpack.reporting.encryptionKey: "c]5@lf16!nu4oHc2U7Jx9z8eA%tQb3gS"
