@@ -29,7 +29,7 @@ class MySqlManager:
                 pool_timeout=app_config.db.pool_timeout, # 连接等待超时时间
                 pool_pre_ping=True,  # 每次使用连接之前检查session是否可用，不可用则重新建立连接
                 pool_recycle=app_config.db.pool_recycle_timeout, # 连接超过多长空闲时间后回收，单位是秒
-                echo=app_config.db.logger,  # 打印 SQL 日志（调试用）
+                # echo=app_config.db.logger,  # 打印 SQL 日志（调试用）
             )
 
             # 创建会话工厂
@@ -40,9 +40,7 @@ class MySqlManager:
                 # 当为True，对于同一个Session，如果执行了commit动作以后，自己持有的对象状态会被全部标记为过期，后续再获取该对象属性会自动触发数据库查询获取最新记录
                 # 该属性只针对自己的会话有效，不影响其他会话
                 # 异步环境只能为False，因为异步下属性访问（如 obj.name）会触发异步 I/O 导致崩溃，需要最新数据时只能手动 await session.refresh()
-                expire_on_commit=False,
-                # 关闭自动管理事务，手动管理事务
-                autobegin=False,
+                expire_on_commit=False
             )
 
             logger.info("MySQL 客户端初始化完成")

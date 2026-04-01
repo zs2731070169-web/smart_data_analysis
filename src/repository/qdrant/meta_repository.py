@@ -1,5 +1,5 @@
 from qdrant_client import AsyncQdrantClient
-from qdrant_client.http.models import Distance, PointStruct
+from qdrant_client.http.models import Distance, PointStruct, QueryResponse
 from qdrant_client.models import VectorParams
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -57,3 +57,17 @@ class MetaQdrantRepository:
                 logger.info(f"已清空集合 {collection}")
         except Exception as e:
             logger.warning(f"清空原有元数据集合失败: {e}")
+
+    async def search_column_payload(self,
+                                    collection_name: str,
+                                    embeddings: list[float],
+                                    k_top: int=8,
+                                    threshold: int=0.5
+                                    ) -> QueryResponse:
+        return await self.qdrant_client.query_points(
+            collection_name=collection_name,
+            query=embeddings,
+            with_payload=True,
+            limit=k_top,
+            score_threshold=threshold
+        )

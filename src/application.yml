@@ -42,10 +42,12 @@ es:
   host: localhost
   port: 9200
   username: elastic
-  password: elastic
+  password: changeme
   index_name: data_agent
 
 
 llm:
-  model_name: deepseek-chat
-  api_key: sk-*****
+  llm_expand_keywords:
+    model_name: qwen-max
+    api_key: sk-4b46af6488c04528a00c8035b25dae8a
+    url: https://dashscope.aliyuncs.com/compatible-mode/v1

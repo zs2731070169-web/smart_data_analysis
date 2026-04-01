@@ -1,0 +1,40 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	entity_extract(entity_extract)
+	column_retrieval_node(column_retrieval_node)
+	metrics_retrieval_node(metrics_retrieval_node)
+	value_retrieval_node(value_retrieval_node)
+	merge_node(merge_node)
+	table_filter_node(table_filter_node)
+	metric_filter_node(metric_filter_node)
+	expand_node(expand_node)
+	generate_sql_node(generate_sql_node)
+	validate_sql_node(validate_sql_node)
+	correct_sql_node(correct_sql_node)
+	execute_sql_node(execute_sql_node)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> entity_extract;
+	column_retrieval_node --> merge_node;
+	correct_sql_node --> validate_sql_node;
+	entity_extract --> column_retrieval_node;
+	entity_extract --> metrics_retrieval_node;
+	entity_extract --> value_retrieval_node;
+	expand_node --> generate_sql_node;
+	generate_sql_node --> validate_sql_node;
+	merge_node --> metric_filter_node;
+	merge_node --> table_filter_node;
+	metric_filter_node --> expand_node;
+	metrics_retrieval_node --> merge_node;
+	table_filter_node --> expand_node;
+	validate_sql_node -.-> correct_sql_node;
+	validate_sql_node -.-> execute_sql_node;
+	value_retrieval_node --> merge_node;
+	execute_sql_node --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

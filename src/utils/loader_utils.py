@@ -21,3 +21,13 @@ def load_conf(schema_cls: Type[T], conf_path: Path) -> T:
     config = OmegaConf.merge(structure, conf_content)
     # 转为 schema_cls 对象
     return OmegaConf.to_object(config)
+
+
+def load_prompt(prompt: str) -> str:
+    """
+    根据prompt名称加载prompt文件
+    :param prompt:
+    :return:
+    """
+    path = Path(__file__).parents[2] / "prompts" / prompt
+    return path.read_text(encoding="utf-8")

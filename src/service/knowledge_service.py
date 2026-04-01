@@ -9,12 +9,12 @@ from qdrant_client.models import PointStruct
 from sqlalchemy.inspection import inspect
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from conf.app_config import app_config
+from conf.app_config import app_config, COLUMN_VALUE_INDEX, META_METRICS_COLLECTION, META_TABLE_COLUMN_COLLECTION
 from conf.meta_config import MetaConfig, TableConfig, MetricConfig
 from infra.factory.repository_factory import Repositories
 from infra.log.logging import logger
 from models.meta_models import TableInfo, ColumnInfo, MetricInfo
-from utils.config_loader_utils import load_conf
+from utils.loader_utils import load_conf
 
 BATCH_SIZE = 20
 COLUMN_VALUES_BATCH_SIZE = 1000
@@ -44,19 +44,14 @@ class KnowledgeService:
         meta_conf = load_conf(MetaConfig, Path(conf_path))
         logger.info(f"加载配置文件成功")
 
-        meta_table_column_collection = "meta_table_column_collection"
-        meta_metrics_collection = "meta_metrics_collection"
-        column_value_index = "column_value_index"
-
         # 清除所有现有数据（幂等创建）
         await self.meta_repository.clear_all(
             ["column_metric", "column_info", "metric_info", "table_info"]
         )
         await self.qdrant_repository.clear_all(
-            [meta_table_column_collection,
-            meta_metrics_collection]
+            [META_TABLE_COLUMN_COLLECTION, META_METRICS_COLLECTION]
         )
-        await self.value_repository.clear_all(column_value_index)
+        await self.value_repository.clear_all(COLUMN_VALUE_INDEX)
 
         # =====================处理表、字段元信息=========================
 
@@ -68,10 +63,10 @@ class KnowledgeService:
         column_infos, table_infos = await self._build_table_column_meta_info(table_configs)
 
         # 字段元数据转为向量
-        await self._async_to_qdrant(meta_table_column_collection, column_infos, ColumnInfo)
+        await self._async_to_qdrant(META_TABLE_COLUMN_COLLECTION, column_infos, ColumnInfo)
 
         # 将字段元数据对应的值构建为全文索引
-        await self._async_to_es(column_value_index, table_infos, table_configs, column_infos)
+        await self._async_to_es(COLUMN_VALUE_INDEX, table_infos, table_configs, column_infos)
 
         # =====================处理指标元信息=========================
 
@@ -83,7 +78,7 @@ class KnowledgeService:
         metric_infos = await self._build_metrics_meta_info(table_infos, column_infos, metrics)
 
         # 指标元数据转为向量
-        await self._async_to_qdrant(meta_metrics_collection, metric_infos, MetricInfo)
+        await self._async_to_qdrant(META_METRICS_COLLECTION, metric_infos, MetricInfo)
 
     async def _build_table_column_meta_info(self, table_configs: list[TableConfig]) -> tuple[list[Any], list[Any]]:
         """
@@ -150,11 +145,13 @@ class KnowledgeService:
         await self.meta_repository.batch_add_meta_records(column_infos + table_infos)
         return column_infos, table_infos
 
-    async def _async_to_qdrant(self, collection_name, items, item_cls: T):
+    async def _async_to_qdrant(self, collection_name, items, item_cls: T, extra_payload_fn=None):
         """
         把元数据转为向量存储到qdrant
-        :param column_infos:
+        :param items:
         :param collection_name:
+        :param extra_payload_fn:
+        :param item_cls:
         :return:
         """
         logger.info(f"正在把 {item_cls.__name__} 元数据转为向量存储到qdrant, 共 {len(items)} 条数据")
@@ -178,10 +175,10 @@ class KnowledgeService:
                 # 待向量化的文本列表
                 candidate_embed_texts.append(text)
                 # 把column对象转字典，并添加到载荷列表
-                payloads.append({
-                    column_attr.key: getattr(item, column_attr.key)
-                    for column_attr in column_attrs  # type: ignore
-                })
+                payload = {}
+                for column_attr in column_attrs:  # type: ignore
+                    payload.update({column_attr.key: getattr(item, column_attr.key)})
+                payloads.append(payload)
 
         offset = 0  # 偏移量
 

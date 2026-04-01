@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
-from utils.config_loader_utils import load_conf
+from utils.loader_utils import load_conf
 
 
 # ============================== 日志配置 ==============================
@@ -76,11 +77,17 @@ class ESConfig:
     index_name: str
 
 
+@dataclass
+class LlmExpandKeywords:
+    model_name: str
+    api_key: str
+    url: str
+
+
 # ============================== 大模型配置 ==============================
 @dataclass
 class LLMConfig:
-    model_name: str
-    api_key: str
+    llm_expand_keywords: LlmExpandKeywords
 
 
 # ============================== 总配置 ==============================
@@ -94,6 +101,13 @@ class AppConfig:
     es: ESConfig
     llm: LLMConfig
 
+
+# ============================== qdrant集合名 ==============================
+META_TABLE_COLUMN_COLLECTION = "meta_table_column_collection"
+META_METRICS_COLLECTION = "meta_metrics_collection"
+
+# ============================== es索引 ==============================
+COLUMN_VALUE_INDEX = "column_value_index"
 
 # 加载配置内容，返回AppConfig实例
 app_config = load_conf(AppConfig, Path(__file__).parents[2] / 'src' / 'application.yml')

@@ -17,7 +17,8 @@ class EsManager:
         try:
             self.es_client = AsyncElasticsearch(
                 f"http://{app_config.es.host}:{app_config.es.port}",
-                basic_auth=(app_config.es.username, app_config.es.password)
+                basic_auth=(app_config.es.username, app_config.es.password),
+                timeout=60
             )
             logger.info("Elasticsearch 客户端初始化完成")
         except RuntimeError as e:
@@ -71,9 +72,9 @@ if __name__ == '__main__':
             }
         )
 
-        result = await es_manager.es_client.search(index="my_index", query={
+        result = await es_manager.es_client.search(index="column_value_index", query={
             "match": {
-                "foo": "foo"
+                "value": "1"
             }
         })
 

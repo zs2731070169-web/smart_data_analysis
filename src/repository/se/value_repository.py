@@ -66,3 +66,21 @@ class ValueESRepository:
             logger.warning(f"索引 {column_value_index} 不存在，无法删除: {e}")
         except Exception as e:
             logger.warning(f"清空索引 {column_value_index} 失败: {e}")
+
+    async def search(self, index_name: str, keyword: str, size: int = 8, score: int = 0.5):
+        try:
+            result = await self.es_client.search(
+                index=index_name,
+                query={
+                    "match": {
+                        "value": keyword
+                    }
+                },
+                size=size,
+                min_score=score
+            )
+            hits = result.body['hits']['hits']
+            return [hit.get('_source') for hit in hits]
+        except Exception as e:
+            logger.warning(f"es检索错误：{e}")
+            raise

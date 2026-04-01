@@ -14,4 +14,4 @@ wheels/
 /logs/
 
 /docker/
-/db/
+/docker/hive/
