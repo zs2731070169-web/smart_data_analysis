@@ -2,8 +2,8 @@ import jieba
 import jieba.analyse
 from langgraph.runtime import Runtime
 
-from infra.agent.context import EnvContext
-from infra.agent.state import InputState
+from agent.context import EnvContext
+from agent.state import InputState
 from infra.log.logging import logger
 
 # 对查询进行分词，只提取指定词性的词

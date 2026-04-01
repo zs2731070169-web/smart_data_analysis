@@ -2,8 +2,8 @@ from typing import Any, TypeVar
 
 from langgraph.runtime import Runtime
 
-from infra.agent.context import EnvContext
-from infra.agent.state import OverallState, TableColumnState, TableState, MetricState
+from agent.context import EnvContext
+from agent.state import OverallState, TableColumnState, TableState, MetricState
 from infra.log.logging import logger
 from models.meta_models import ColumnInfo
 
