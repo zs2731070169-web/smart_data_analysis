@@ -1,9 +1,9 @@
 from langgraph.runtime import Runtime
 
 from conf.app_config import META_METRICS_COLLECTION
-from agent.context import EnvContext
+from agent.schema.context_schema import EnvContext
 from agent.node._common import expand_keywords, qdrant_retrieval
-from agent.state import OverallState
+from agent.schema.state_schema import OverallState
 from infra.log.logging import logger
 from utils.loader_utils import load_prompt
 
@@ -16,7 +16,7 @@ async def metrics_retrieval_node(state: OverallState, runtime: Runtime[EnvContex
     :return:
     """
     writer = runtime.stream_writer
-    writer("开始指标召回节点")
+    writer("开始执行指标召回节点")
 
     # ============== 扩展指标召回的关键词 =================
 
@@ -37,4 +37,4 @@ async def metrics_retrieval_node(state: OverallState, runtime: Runtime[EnvContex
         embedding_client=runtime.context.get('embedding_client')
     )
 
-    return {"metrics_list": unique_metrics_list}
+    return {"retrieval_metrics_list": unique_metrics_list}

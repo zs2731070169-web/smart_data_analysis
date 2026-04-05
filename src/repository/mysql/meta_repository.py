@@ -1,6 +1,7 @@
 from typing import List, Optional, Sequence
 
-from sqlalchemy import text, quoted_name, select
+from sqlalchemy import text, quoted_name, select, or_, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -71,13 +72,15 @@ class MetaMysqlRepository:
         :param table_ids:
         :return:
         """
+        if not table_ids:
+            return {}
         try:
             async with self.session() as session:
                 sql = text("""
-                    select id, name
-                    from table_info
-                    where id in :table_ids
-                """)
+                           select id, name
+                           from table_info
+                           where id in :table_ids
+                           """)
                 result = await session.execute(sql, {"table_ids": tuple(table_ids)})
                 return {row.id: row.name for row in result.fetchall()}
         except Exception as e:
@@ -93,7 +96,8 @@ class MetaMysqlRepository:
         """
         try:
             async with self.session() as session:
-                sql = select(ColumnInfo).where(ColumnInfo.metrics.any(MetricInfo.id == metric_id), ColumnInfo.name == column_name)
+                sql = select(ColumnInfo).where(ColumnInfo.metrics.any(MetricInfo.id == metric_id),
+                                               ColumnInfo.name == column_name)
                 result = await session.execute(sql)
                 # 返回单条记录或none
                 return result.scalar_one_or_none()
@@ -114,21 +118,99 @@ class MetaMysqlRepository:
             logger.error(f"根据id获取表信息失败: {e}")
             return None
 
-    async def get_columns_by_role_and_table_role(self, column_role, table_role) -> Sequence[ColumnInfo]:
+    # async def get_columns_by_role_and_table_role(self, column_role, table_role) -> Sequence[ColumnInfo]:
+    #     """
+    #     从字段角色和表角色中获取字段信息列表
+    #     :param column_role:
+    #     :param table_role:
+    #     :return:
+    #     """
+    #     async with self.session() as session:
+    #         try:
+    #             sql = select(ColumnInfo).join(TableInfo).where(ColumnInfo.role == column_role,
+    #                                                            TableInfo.role == table_role)
+    #             result = await session.execute(sql)
+    #             # 返回多条记录
+    #             return result.scalars().all()
+    #         except Exception as e:
+    #             logger.error(f"根据字段角色和表角色获取字段信息失败: {e}")
+    #             return []
+
+    async def get_column_primary_key_by_table_id(self, table_id) -> ColumnInfo | None:
         """
-        从字段角色和表角色中获取字段信息列表
-        :param column_role:
-        :param table_role:
+        根据表id查找字段主键
+        :param table_id:
         :return:
         """
-        async with self.session() as session:
-            try:
-                sql = select(ColumnInfo).join(TableInfo).where(ColumnInfo.role == column_role, TableInfo.role == table_role)
+        try:
+            async with self.session() as session:
+                sql = select(ColumnInfo).where(ColumnInfo.table_id == table_id, ColumnInfo.role == 'primary_key')
                 result = await session.execute(sql)
-                # 返回多条记录
+                return result.scalars().first()
+        except Exception as e:
+            logger.error(f"根据表id获取主键字段信息失败: {e}")
+            return None
+
+    # async def get_column_primary_key_by_table_name(self, table_name) -> ColumnInfo | None:
+    #     """通过表名获取字段主键id"""
+    #     try:
+    #         async with self.session() as session:
+    #             sql = select(ColumnInfo).join(TableInfo).where(ColumnInfo.role == 'primary_key',
+    #                                                            TableInfo.name == table_name)
+    #             result = await session.execute(sql)
+    #             return result.scalar_one_or_none()
+    #     except Exception as e:
+    #         logger.error(f"根据表名获取主键字段信息失败: {e}")
+    #         return None
+
+    async def get_columns_foreign_key_by_id(self, table_id) -> Sequence[ColumnInfo] | []:
+        try:
+            async with self.session() as session:
+                sql = select(ColumnInfo).where(ColumnInfo.table_id == table_id, ColumnInfo.role == 'foreign_key')
+                result = await session.execute(sql)
                 return result.scalars().all()
-            except Exception as e:
-                logger.error(f"根据字段角色和表角色获取字段信息失败: {e}")
-                return []
+        except Exception as e:
+            logger.error(f"根据表id获取外键字段信息失败: {e}")
+            return []
 
+    async def get_column_by_name_list(self, column_names: list[str]) -> Sequence[ColumnInfo] | []:
+        """
+        根据字段名查询字段信息
+        :param column_names:
+        :return:
+        """
+        try:
+            async with self.session() as session:
+                sql = select(ColumnInfo).options(selectinload(ColumnInfo.table)).where(
+                    ColumnInfo.name.in_(column_names))
+                result = await session.execute(sql)
+                return result.scalars().all()
+        except Exception as e:
+            logger.info(f"根据字段名查询字段信息失败: {e}")
+            return []
 
+    async def get_metric_by_name_list(self, metric_names: list[str]) -> Sequence[MetricInfo] | []:
+        """
+        根据指标名查询指标信息
+        :param metric_names:
+        :return:
+        """
+        try:
+            async with self.session() as session:
+                sql = select(MetricInfo).where(
+                    or_(
+                        MetricInfo.name.in_(metric_names),
+                        # 判断数据库里存的别名数组与查询数组是否有交集, 返回 1 表示有交集，即命中别名
+                        func.JSON_OVERLAPS(MetricInfo.alias, func.JSON_ARRAY(*metric_names)) == 1
+                    )
+                )
+                result = await session.execute(sql)
+                seen, unique = set(), []
+                for metric in result.scalars().all():
+                    if metric.id not in seen:
+                        seen.add(metric.id)
+                        unique.append(metric)
+                return unique
+        except Exception as e:
+            logger.info(f"根据指标名查询指标信息失败: {e}")
+            return []

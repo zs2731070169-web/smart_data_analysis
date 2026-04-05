@@ -428,6 +428,15 @@ wheels = [
 ]
 
 [[package]]
+name = "docstring-parser"
+version = "0.17.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b2/9d/c3b43da9515bd270df0f80548d9944e389870713cc1fe2b8fb35fe2bcefd/docstring_parser-0.17.0.tar.gz", hash = "sha256:583de4a309722b3315439bb31d64ba3eebada841f2e2cee23b99df001434c912", size = 27442, upload-time = "2025-07-21T07:35:01.868Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/e2/2537ebcff11c1ee1ff17d8d0b6f4db75873e3b0fb32c2d4a2ee31ecb310a/docstring_parser-0.17.0-py3-none-any.whl", hash = "sha256:cf2569abd23dce8099b300f9b4fa8191e9582dda731fd533daf54c4551658708", size = 36896, upload-time = "2025-07-21T07:35:00.684Z" },
+]
+
+[[package]]
 name = "elastic-transport"
 version = "8.17.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1089,6 +1098,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/81/e5/56fdeedaa0ef1be3c53721d382d9e21c63930179567361610ea6102c04ea/langchain-1.2.13.tar.gz", hash = "sha256:d566ef67c8287e7f2e2df3c99bf3953a6beefd2a75a97fe56ecce905e21f3ef4", size = 573819, upload-time = "2026-03-19T17:16:07.641Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9c/1d/a509af07535d8f4621d77f3ba5ec846ee6d52c59d2239e1385ec3b29bf92/langchain-1.2.13-py3-none-any.whl", hash = "sha256:37d4526ac4b0cdd3d7706a6366124c30dc0771bf5340865b37cdc99d5e5ad9b1", size = 112488, upload-time = "2026-03-19T17:16:06.134Z" },
+]
+
+[[package]]
+name = "langchain-anthropic"
+version = "1.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anthropic" },
+    { name = "langchain-core" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/98/c7/259d4d805c6ac90c8695714fc15498a4557bb515eb24f692fd611966e383/langchain_anthropic-1.4.0.tar.gz", hash = "sha256:bbf64e99f9149a34ba67813e9582b2160a0968de9e9f54f7ba8d1658f253c2e5", size = 674360, upload-time = "2026-03-17T18:42:20.751Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2e/c0/77f99373276d4f06c38a887ef6023f101cfc7ba3b2bf9af37064cdbadde5/langchain_anthropic-1.4.0-py3-none-any.whl", hash = "sha256:c84f55722336935f7574d5771598e674f3959fdca0b51de14c9788dbf52761be", size = 48463, upload-time = "2026-03-17T18:42:19.742Z" },
 ]
 
 [[package]]
@@ -2253,6 +2276,7 @@ dependencies = [
     { name = "huggingface-hub" },
     { name = "jieba" },
     { name = "langchain" },
+    { name = "langchain-anthropic" },
     { name = "langchain-deepseek" },
     { name = "langchain-huggingface" },
     { name = "langgraph" },
@@ -2276,6 +2300,7 @@ requires-dist = [
     { name = "huggingface-hub", specifier = ">=1.8.0" },
     { name = "jieba", specifier = ">=0.42.1" },
     { name = "langchain", specifier = ">=1.2.13" },
+    { name = "langchain-anthropic", specifier = ">=1.4.0" },
     { name = "langchain-deepseek", specifier = ">=1.0.1" },
     { name = "langchain-huggingface", specifier = ">=1.2.1" },
     { name = "langgraph", specifier = ">=1.1.3" },

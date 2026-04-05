@@ -2,12 +2,12 @@ import jieba
 import jieba.analyse
 from langgraph.runtime import Runtime
 
-from agent.context import EnvContext
-from agent.state import InputState
+from agent.schema.context_schema import EnvContext
+from agent.schema.state_schema import InputState
 from infra.log.logging import logger
 
 # 对查询进行分词，只提取指定词性的词
-allow_pos = (
+ALLOW_POS = (
     "n",  # 名词: 数据、服务器、表格
     "nr",  # 人名: 张三、李四
     "ns",  # 地名: 北京、上海
@@ -31,12 +31,12 @@ def entity_extract(state: InputState, runtime: Runtime[EnvContext]) -> dict[str,
     :return:
     """
     writer = runtime.stream_writer
-    writer("开始实体抽取节点")
+    writer("开始执行实体抽取节点")
 
     question = state['question']
 
     # 提取实体
-    entities = jieba.analyse.extract_tags(question, allowPOS=allow_pos)
+    entities = jieba.analyse.extract_tags(question, allowPOS=ALLOW_POS)
 
     # 添加问题，防止实体抽取遗漏
     entities.append(question)

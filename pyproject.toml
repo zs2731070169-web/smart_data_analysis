@@ -24,4 +24,5 @@ dependencies = [
     "thrift>=0.21.0",
     "aiomysql>=0.3.2",
     "thrift-sasl>=0.4.3",
+    "json-repair>=0.30.0",
 ]

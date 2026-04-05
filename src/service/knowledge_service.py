@@ -4,7 +4,6 @@ import uuid
 from pathlib import Path
 from typing import AsyncGenerator, Any, TypeVar
 
-from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from qdrant_client.models import PointStruct
 from sqlalchemy.inspection import inspect
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -13,6 +12,7 @@ from conf.app_config import app_config, COLUMN_VALUE_INDEX, META_METRICS_COLLECT
 from conf.meta_config import MetaConfig, TableConfig, MetricConfig
 from infra.factory.repository_factory import Repositories
 from infra.log.logging import logger
+from infra.manager.embedding_client import embedding_manager
 from models.meta_models import TableInfo, ColumnInfo, MetricInfo
 from utils.loader_utils import load_conf
 
@@ -30,9 +30,7 @@ class KnowledgeService:
         self.meta_repository = repos.meta
         self.qdrant_repository = repos.meta_qdrant
         self.value_repository = repos.value_es
-        self.embedding_client = HuggingFaceEndpointEmbeddings(
-            model=f"http://{app_config.embedding.host}:{app_config.embedding.port}"
-        )
+        self.embedding_client = embedding_manager.embedding_client
 
     async def execute(self, conf_path: str):
         """

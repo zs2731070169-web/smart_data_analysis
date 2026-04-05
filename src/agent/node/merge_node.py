@@ -1,9 +1,9 @@
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from langgraph.runtime import Runtime
 
-from agent.context import EnvContext
-from agent.state import OverallState, TableColumnState, TableState, MetricState
+from agent.schema.context_schema import EnvContext
+from agent.schema.state_schema import OverallState, TableColumnState, TableState, MetricState
 from infra.log.logging import logger
 from models.meta_models import ColumnInfo
 
@@ -16,14 +16,14 @@ async def merge_node(state: OverallState, runtime: Runtime[EnvContext]):
     :return:
     """
     writer = runtime.stream_writer
-    writer("开始召回结果合并节点")
+    writer("开始执行召回结果合并节点")
 
     meta_repository = runtime.context.get('repositories').meta
 
     # 召回的字段、字段值、指标列表
-    column_list: list[dict[str, Any]] = state.get('column_list')
-    value_list: list[dict[str, Any]] = state.get('value_list')
-    metrics_list: list[dict[str, Any]] = state.get('metrics_list')
+    column_list: list[dict[str, Any]] = state.get('retrieval_column_list', [])
+    value_list: list[dict[str, Any]] = state.get('retrieval_value_list', [])
+    metrics_list: list[dict[str, Any]] = state.get('retrieval_metrics_list', [])
 
     # 合并以后的表和指标列表
     table_info_list = []
@@ -76,13 +76,6 @@ async def merge_node(state: OverallState, runtime: Runtime[EnvContext]):
 
     logger.info("指标相关字段合并成功")
 
-    # 获取所有事实表中角色是外键的字段元信息，并添加到字段映射字典里，保证外键字段一定在实时表里，用于生成关联查询的sql
-    columns = await meta_repository.get_columns_by_role_and_table_role('foreign_key', 'fact')
-    for column in columns:
-        column_map[column.id] = _convert_dict(ColumnInfo, column)
-
-    logger.info("事实表外键字段合并成功")
-
     # 将字段用表id进行分组，每个表对应自己的字段
     table_column_map = {}
     for column in column_map.values():
@@ -97,17 +90,23 @@ async def merge_node(state: OverallState, runtime: Runtime[EnvContext]):
         if table_info is None:
             logger.warning(f"未找到表 {table_id} 的元数据，跳过")
             continue
-        # 便利字段列表构建返回字段状态信息
-        table_column_state_list = []
+        # 遍历字段列表构建返回字段状态信息
+        table_column_state_list: list[TableColumnState] = []
         for table_column in table_columns:
-            table_column_state = TableColumnState()
-            table_column_state.name = table_column['name']
-            table_column_state.type = table_column['type']
-            table_column_state.role = table_column['role']
-            table_column_state.description = table_column['description']
-            table_column_state.examples = table_column['examples']
-            table_column_state.alias = table_column['alias']
-            table_column_state_list.append(table_column_state)
+            table_column_state_list.append(_convert_to_table_column_state(table_column))
+        # 如果是维度表，判断主键是否在该表字段列表里，如果不在则到数据库查询，并把主键字段添加到对应表字段列表
+        column_roles = [table_column_state.role for table_column_state in table_column_state_list]
+        if 'dim' == table_info.role and 'primary_key' not in column_roles:
+            primary_key = await meta_repository.get_column_primary_key_by_table_id(table_id)
+            if primary_key:
+                table_column_state_list.append(_convert_to_table_column_state(primary_key))
+        # 如果是事实表，就获取他的所有主键，将table_column_state_list不存在的主键添加进去
+        elif 'fact' == table_info.role:
+            foreign_keys = await meta_repository.get_columns_foreign_key_by_id(table_id)
+            column_name_list = [column['name'] for column in table_columns]
+            for foreign_key in foreign_keys:
+                if foreign_key and foreign_key.name not in column_name_list:
+                    table_column_state_list.append(_convert_to_table_column_state(foreign_key))
         # 构建表状态信息
         table_state = TableState()
         table_state.name = table_info.name
@@ -121,23 +120,45 @@ async def merge_node(state: OverallState, runtime: Runtime[EnvContext]):
 
     # 构建指标信息列表
     for metric in metrics_list:
-        metric_state = MetricState()
-        metric_state.name = metric['name']
-        metric_state.description = metric['description']
-        metric_state.relevant_columns = metric['relevant_columns']
-        metric_state.alias = metric['alias']
-        metrics_info_list.append(metric_state)
+        metrics_info_list.append(MetricState(
+            name=metric['name'],
+            description=metric['description'],
+            relevant_columns=metric['relevant_columns'],
+            alias=metric['alias']
+        ))
 
     logger.info("metrics_info_list 指标信息列表构建成功")
 
     logger.info(f"召回信息合并成功，表信息列表长度: {len(table_info_list)}，指标信息列表长度: {len(metrics_info_list)}")
 
     return {
-        'table_info_list': table_info_list,
-        'metrics_info_list': metrics_info_list,
+        'merge_table_info_list': table_info_list,
+        'merge_metrics_info_list': metrics_info_list,
     }
 
+
+def _convert_to_table_column_state(table_column: Union[dict[str, Any], ColumnInfo]) -> TableColumnState:
+    if isinstance(table_column, dict):
+        return TableColumnState(
+            name=table_column.get('name', ''),
+            type=table_column.get('type', ''),
+            role=table_column.get('role', ''),
+            description=table_column.get('description', ''),
+            examples=table_column.get('examples') or [],
+            alias=table_column.get('alias') or []
+        )
+    return TableColumnState(
+        name=table_column.name or '',
+        type=table_column.type or '',
+        role=table_column.role or '',
+        description=table_column.description or '',
+        examples=table_column.examples or [],
+        alias=table_column.alias or []
+    )
+
+
 T = TypeVar("T")
+
 
 def _convert_dict(orm_cls: T, obj: Any) -> dict[str, Any]:
     return {col.name: getattr(obj, col.name) for col in orm_cls.__mapper__.columns}

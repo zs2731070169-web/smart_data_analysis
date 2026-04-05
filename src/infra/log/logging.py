@@ -6,7 +6,7 @@ from loguru import logger
 
 from conf.app_config import app_config
 from infra.log import task_id_context
-from utils.time_utils import any_datetime, datetime_format, DATE_FORMAT
+from utils.time_utils import datetime_format, DATE_FORMAT, now
 
 log_format = (
     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
@@ -36,7 +36,7 @@ if app_config.logging.file.enable:
     path = root_path / app_config.logging.file.path
     path.mkdir(exist_ok=True, parents=True)
     logger.add(
-        sink=path.joinpath(f"app_{datetime_format(any_datetime(), DATE_FORMAT)}.log"),
+        sink=path.joinpath(f"app_{datetime_format(now(), DATE_FORMAT)}.log"),
         level=app_config.logging.file.level,
         format=log_format,
         rotation=app_config.logging.file.rotation,

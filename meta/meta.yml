@@ -168,13 +168,383 @@ tables:
 
 
 metrics:
-  - name: GMV
+  - name: GMV  # 成交总额
     description: 全称Gross Merchandise Value，表示所有订单的成交金额总和。
     relevant_columns:
       - fact_order.order_amount
     alias: [ 成交总额, 订单总额 ]
-  - name: AOV
+  - name: AOV  # 平均订单金额
     description: 全称Average Order Value，表示所有订单的成交金额平均值。
     relevant_columns:
       - fact_order.order_quantity
     alias: [ 平均单价, 平均订单金额 ]
+
+  # ==================== 销售额 / 金额类 ====================
+  - name: MONTHLY_GMV  # 月销售额
+    description: 按自然月统计的商品成交金额合计，反映各月的营收规模。
+    relevant_columns:
+      - fact_order.order_amount
+      - dim_date.month
+      - dim_date.year
+    alias: [ 月销售额, 月度销售额, 月度GMV, 月度收入 ]
+
+  - name: QUARTERLY_GMV  # 季度销售额
+    description: 按自然季度统计的商品成交金额合计，用于季度营收对比分析。
+    relevant_columns:
+      - fact_order.order_amount
+      - dim_date.quarter
+      - dim_date.year
+    alias: [ 季度销售额, 季度GMV, 季度收入, 季度营收 ]
+
+  - name: ANNUAL_GMV  # 年销售额
+    description: 按自然年统计的商品成交金额合计，反映年度整体营收水平。
+    relevant_columns:
+      - fact_order.order_amount
+      - dim_date.year
+    alias: [ 年销售额, 年度销售额, 年度GMV, 年度营收 ]
+
+  - name: DAR  # 日均销售额
+    description: 全称Daily Average Revenue，统计周期内每天平均成交金额，衡量日常销售稳定性。计算方式为总销售额除以统计天数。
+    relevant_columns:
+      - fact_order.order_amount
+      - dim_date.day
+      - dim_date.month
+      - dim_date.year
+    alias: [ 日均销售额, 日均GMV, 平均日销售额, 每日平均收入 ]
+
+  - name: ASP  # 件单价
+    description: 全称Average Selling Price，每件商品的平均成交价格，计算方式为总销售额除以总销售数量，反映商品平均价格水平。
+    relevant_columns:
+      - fact_order.order_amount
+      - fact_order.order_quantity
+    alias: [ 件单价, 商品均价, 平均售价, 单件均价 ]
+
+  # ==================== 销量类 ====================
+  - name: TOTAL_QTY  # 总销量
+    description: 所有订单商品购买数量的总和，衡量整体销售规模。
+    relevant_columns:
+      - fact_order.order_quantity
+    alias: [ 总销量, 销售总量, 销量总计, 商品销售总件数 ]
+
+  - name: MONTHLY_QTY  # 月销量
+    description: 按自然月统计的商品销售数量合计，反映各月的销量表现。
+    relevant_columns:
+      - fact_order.order_quantity
+      - dim_date.month
+      - dim_date.year
+    alias: [ 月销量, 月度销量, 月销售量 ]
+
+  - name: CATEGORY_QTY  # 品类销量
+    description: 按商品品类维度统计的商品销售数量合计，用于评估各品类的销量贡献。
+    relevant_columns:
+      - fact_order.order_quantity
+      - dim_product.category
+    alias: [ 品类销量, 分类销量, 类目销量 ]
+
+  # ==================== 订单类 ====================
+  - name: ORDER_COUNT  # 订单总数
+    description: 所有成交订单的笔数总和，是衡量业务活跃度的核心指标。
+    relevant_columns:
+      - fact_order.order_id
+    alias: [ 订单总数, 总订单数, 订单量, 下单量, 成交订单数 ]
+
+  - name: DAO  # 日均订单数
+    description: 全称Daily Average Orders，统计周期内每天平均成交的订单笔数，衡量日常下单活跃度。
+    relevant_columns:
+      - fact_order.order_id
+      - dim_date.day
+      - dim_date.month
+      - dim_date.year
+    alias: [ 日均订单数, 日均单量, 日均下单量 ]
+
+  - name: MONTHLY_ORDERS  # 月订单数
+    description: 按自然月统计的订单笔数合计，用于月度订单量对比分析。
+    relevant_columns:
+      - fact_order.order_id
+      - dim_date.month
+      - dim_date.year
+    alias: [ 月订单数, 月度订单数, 月单量, 月度下单量 ]
+
+  - name: CATEGORY_ORDERS  # 品类订单数
+    description: 按商品品类统计的订单笔数，反映各品类的下单活跃度。
+    relevant_columns:
+      - fact_order.order_id
+      - dim_product.category
+    alias: [ 品类订单数, 分类订单数, 类目订单数 ]
+
+  - name: PRODUCT_ORDERS  # 商品订单数
+    description: 按具体商品统计的订单笔数，用于商品粒度的下单活跃度分析。
+    relevant_columns:
+      - fact_order.order_id
+      - dim_product.product_name
+    alias: [ 商品订单数, 单品订单数, 商品下单量 ]
+
+  # ==================== 客户类 ====================
+  - name: CUSTOMER_COUNT  # 客户总数
+    description: 在统计周期内产生购买行为的不重复客户总数，反映活跃买家规模。
+    relevant_columns:
+      - fact_order.customer_id
+    alias: [ 客户总数, 购买客户数, 活跃客户数, 买家数 ]
+
+  - name: RPC  # 客单价
+    description: 全称Revenue Per Customer，每位客户在统计周期内的平均消费金额，计算方式为总销售额除以购买客户数。
+    relevant_columns:
+      - fact_order.order_amount
+      - fact_order.customer_id
+    alias: [ 客单价, 人均消费额, 每客平均消费, 用户客单价 ]
+
+  - name: PF  # 客户购买频次
+    description: 全称Purchase Frequency，客户在统计周期内的平均下单次数，反映客户的购买活跃程度。
+    relevant_columns:
+      - fact_order.order_id
+      - fact_order.customer_id
+    alias: [ 客户购买频次, 购买频率, 客户下单频次, 人均下单次数 ]
+
+  - name: REPURCHASE_COUNT  # 复购客户数
+    description: 在统计周期内发生两次及以上购买行为的客户数量，衡量客户忠诚度。
+    relevant_columns:
+      - fact_order.order_id
+      - fact_order.customer_id
+    alias: [ 复购客户数, 回购客户数, 多次购买客户数 ]
+
+  - name: RPR  # 复购率
+    description: 全称Repurchase Rate，复购客户数与购买客户总数的比值，反映客户的留存与忠诚度水平。
+    relevant_columns:
+      - fact_order.order_id
+      - fact_order.customer_id
+    alias: [ 复购率, 回购率, 客户复购率, 老客占比 ]
+
+  - name: PRODUCT_CUSTOMERS  # 商品客户数
+    description: 按具体商品统计的不重复购买客户数，反映单品的买家覆盖广度。
+    relevant_columns:
+      - fact_order.customer_id
+      - dim_product.product_name
+    alias: [ 商品客户数, 单品客户数, 商品买家数 ]
+
+  # ==================== 商品 / 品类 / 品牌类 ====================
+  - name: CATEGORY_GMV  # 品类销售额
+    description: 按商品品类维度统计的成交金额合计，用于评估各品类的营收贡献。
+    relevant_columns:
+      - fact_order.order_amount
+      - dim_product.category
+    alias: [ 品类销售额, 分类销售额, 类目销售额, 品类GMV ]
+
+  - name: BRAND_GMV  # 品牌销售额
+    description: 按商品品牌维度统计的成交金额合计，用于评估各品牌的营收表现。
+    relevant_columns:
+      - fact_order.order_amount
+      - dim_product.brand
+    alias: [ 品牌销售额, 品牌GMV, 品牌营收 ]
+
+  - name: BRAND_QTY  # 品牌销量
+    description: 按商品品牌维度统计的商品销售数量合计，反映各品牌的销量竞争力。
+    relevant_columns:
+      - fact_order.order_quantity
+      - dim_product.brand
+    alias: [ 品牌销量, 品牌销售量, 品牌出货量 ]
+
+  - name: PRODUCT_GMV  # 商品销售额
+    description: 按具体商品维度统计的成交金额合计，用于商品粒度的营收分析。
+    relevant_columns:
+      - fact_order.order_amount
+      - dim_product.product_name
+    alias: [ 商品销售额, 单品销售额, 商品GMV, 单品营收 ]
+
+  - name: PRODUCT_QTY  # 商品销量
+    description: 按具体商品维度统计的商品销售数量合计，反映单品的销售能力。
+    relevant_columns:
+      - fact_order.order_quantity
+      - dim_product.product_name
+    alias: [ 商品销量, 单品销量, 商品销售量, 单品出货量 ]
+
+  - name: BRAND_ORDERS  # 品牌订单数
+    description: 按商品品牌统计的订单笔数，反映各品牌的下单活跃度。
+    relevant_columns:
+      - fact_order.order_id
+      - dim_product.brand
+    alias: [ 品牌订单数, 品牌下单量, 品牌单量 ]
+
+  - name: BRAND_CUSTOMERS  # 品牌客户数
+    description: 按商品品牌统计的不重复购买客户数，反映各品牌的买家覆盖规模。
+    relevant_columns:
+      - fact_order.customer_id
+      - dim_product.brand
+    alias: [ 品牌客户数, 品牌买家数 ]
+
+  - name: BRAND_RPC  # 品牌客单价
+    description: 按商品品牌统计的平均客单价，计算方式为品牌总销售额除以该品牌的购买客户数，反映各品牌的客户消费能力。
+    relevant_columns:
+      - fact_order.order_amount
+      - fact_order.customer_id
+      - dim_product.brand
+    alias: [ 品牌客单价, 品牌人均消费 ]
+
+  # ==================== 地区类 ====================
+  - name: PROVINCE_GMV  # 省份销售额
+    description: 按省份维度统计的成交金额合计，用于分析各省份的营收贡献与区域差异。
+    relevant_columns:
+      - fact_order.order_amount
+      - dim_region.province
+    alias: [ 省份销售额, 省份GMV, 各省销售额 ]
+
+  - name: REGION_GMV  # 大区销售额
+    description: 按大区维度（如华东、华南等）统计的成交金额合计，用于大区级别的营收对比。
+    relevant_columns:
+      - fact_order.order_amount
+      - dim_region.region_name
+    alias: [ 大区销售额, 区域销售额, 大区GMV, 区域营收 ]
+
+  - name: PROVINCE_ORDERS  # 省份订单数
+    description: 按省份统计的订单笔数，反映各省份的下单活跃度与市场规模。
+    relevant_columns:
+      - fact_order.order_id
+      - dim_region.province
+    alias: [ 省份订单数, 省份单量, 各省订单数 ]
+
+  - name: REGION_CUSTOMERS  # 大区客户数
+    description: 按大区统计的不重复购买客户数，反映各大区的活跃买家规模。
+    relevant_columns:
+      - fact_order.customer_id
+      - dim_region.region_name
+    alias: [ 大区客户数, 区域客户数, 大区买家数 ]
+
+  - name: PROVINCE_QTY  # 省份销量
+    description: 按省份统计的商品销售数量合计，用于分析各省份的销量贡献。
+    relevant_columns:
+      - fact_order.order_quantity
+      - dim_region.province
+    alias: [ 省份销量, 各省销量 ]
+
+  - name: REGION_QTY  # 大区销量
+    description: 按大区统计的商品销售数量合计，用于大区级别的销量对比。
+    relevant_columns:
+      - fact_order.order_quantity
+      - dim_region.region_name
+    alias: [ 大区销量, 区域销量 ]
+
+  - name: REGION_ORDERS  # 大区订单数
+    description: 按大区统计的订单笔数，反映各大区的下单活跃度与市场规模。
+    relevant_columns:
+      - fact_order.order_id
+      - dim_region.region_name
+    alias: [ 大区订单数, 区域订单数, 大区单量 ]
+
+  - name: PROVINCE_CUSTOMERS  # 省份客户数
+    description: 按省份统计的不重复购买客户数，反映各省份的买家规模与市场渗透度。
+    relevant_columns:
+      - fact_order.customer_id
+      - dim_region.province
+    alias: [ 省份客户数, 各省客户数, 省份买家数 ]
+
+  - name: COUNTRY_GMV  # 国家销售额
+    description: 按国家统计的成交金额合计，用于跨国销售的营收对比分析。
+    relevant_columns:
+      - fact_order.order_amount
+      - dim_region.country
+    alias: [ 国家销售额, 按国家销售额, 国家GMV ]
+
+  # ==================== 会员 / 人群类 ====================
+  - name: MEMBER_GMV  # 会员销售额
+    description: 按客户会员等级统计的成交金额合计，用于评估不同会员层级的营收贡献。
+    relevant_columns:
+      - fact_order.order_amount
+      - dim_customer.member_level
+    alias: [ 会员销售额, 会员GMV, 会员消费额 ]
+
+  - name: MEMBER_COUNT  # 会员客户数
+    description: 按客户会员等级统计的不重复购买客户数，反映各等级会员的活跃规模。
+    relevant_columns:
+      - fact_order.customer_id
+      - dim_customer.member_level
+    alias: [ 会员客户数, 各级会员数, 会员买家数 ]
+
+  - name: GENDER_GMV  # 性别销售额
+    description: 按客户性别统计的成交金额合计，用于分析男女客户的消费差异。
+    relevant_columns:
+      - fact_order.order_amount
+      - dim_customer.gender
+    alias: [ 性别销售额, 按性别销售额, 男女消费额 ]
+
+  - name: CATEGORY_RPC  # 品类客单价
+    description: 各商品品类的平均客单价，计算方式为品类总销售额除以该品类的购买客户数，反映不同品类的消费能力。
+    relevant_columns:
+      - fact_order.order_amount
+      - fact_order.customer_id
+      - dim_product.category
+    alias: [ 品类客单价, 品类人均消费, 分类客单价 ]
+
+  - name: MEMBER_QTY  # 会员销量
+    description: 按客户会员等级统计的商品销售数量合计，反映各等级会员的购买量贡献。
+    relevant_columns:
+      - fact_order.order_quantity
+      - dim_customer.member_level
+    alias: [ 会员销量, 会员购买量 ]
+
+  - name: MEMBER_ORDERS  # 会员订单数
+    description: 按客户会员等级统计的订单笔数，反映各等级会员的下单活跃度。
+    relevant_columns:
+      - fact_order.order_id
+      - dim_customer.member_level
+    alias: [ 会员订单数, 会员下单量, 会员单量 ]
+
+  - name: GENDER_QTY  # 性别销量
+    description: 按客户性别统计的商品销售数量合计，用于分析男女客户的购买量差异。
+    relevant_columns:
+      - fact_order.order_quantity
+      - dim_customer.gender
+    alias: [ 性别销量, 男女销量, 按性别销量 ]
+
+  - name: GENDER_ORDERS  # 性别订单数
+    description: 按客户性别统计的订单笔数，反映男女客户的下单活跃度差异。
+    relevant_columns:
+      - fact_order.order_id
+      - dim_customer.gender
+    alias: [ 性别订单数, 男女订单数, 按性别订单数 ]
+
+  - name: CATEGORY_CUSTOMERS  # 品类客户数
+    description: 按商品品类统计的不重复购买客户数，反映各品类的买家覆盖广度。
+    relevant_columns:
+      - fact_order.customer_id
+      - dim_product.category
+    alias: [ 品类客户数, 分类客户数, 类目客户数, 品类买家数 ]
+
+  # ==================== 时间维度扩展 ====================
+  - name: ANNUAL_QTY  # 年销量
+    description: 按自然年统计的商品销售数量合计，反映年度整体销量规模。
+    relevant_columns:
+      - fact_order.order_quantity
+      - dim_date.year
+    alias: [ 年销量, 年度销量, 年度销售数量 ]
+
+  - name: QUARTERLY_QTY  # 季度销量
+    description: 按自然季度统计的商品销售数量合计，用于季度销量对比分析。
+    relevant_columns:
+      - fact_order.order_quantity
+      - dim_date.quarter
+      - dim_date.year
+    alias: [ 季度销量, 季度销售数量 ]
+
+  - name: ANNUAL_ORDERS  # 年订单数
+    description: 按自然年统计的订单笔数合计，用于年度订单规模对比分析。
+    relevant_columns:
+      - fact_order.order_id
+      - dim_date.year
+    alias: [ 年订单数, 年度订单数, 年度下单量 ]
+
+  - name: QUARTERLY_ORDERS  # 季度订单数
+    description: 按自然季度统计的订单笔数合计，用于季度订单量对比分析。
+    relevant_columns:
+      - fact_order.order_id
+      - dim_date.quarter
+      - dim_date.year
+    alias: [ 季度订单数, 季度下单量, 季度单量 ]
+
+  - name: DAC  # 日均客户数
+    description: 全称Daily Average Customers，统计周期内每天平均产生购买行为的不重复客户数，衡量日常买家活跃度。
+    relevant_columns:
+      - fact_order.customer_id
+      - dim_date.day
+      - dim_date.month
+      - dim_date.year
+    alias: [ 日均客户数, 日均买家数, 日均活跃客户数 ]
+

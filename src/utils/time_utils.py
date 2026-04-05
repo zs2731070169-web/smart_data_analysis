@@ -4,6 +4,11 @@ DATE_FORMAT = "%Y-%m-%d"
 TIME_FORMAT = "%H:%M:%S"
 DATETIME_FORMAT = f"{DATE_FORMAT} {TIME_FORMAT}"
 
+def quarter(month_at: int):
+    """计算季度"""
+    return (month_at - 1) // 3 + 1
+
+
 def datetime_format(time_at: datetime, format: str) -> str:
     """
     获取格式化时间
@@ -13,15 +18,10 @@ def datetime_format(time_at: datetime, format: str) -> str:
     """
     return time_at.strftime(format=format)
 
+def month():
+    """获取当前月份"""
+    return now().month
 
-def any_datetime(days: int = 0, hours: int = 0, minutes: int = 0, seconds: int = 0) -> datetime:
-    """
-    获取任意东八区时间
-    :param days:
-    :param hours:
-    :param minutes:
-    :param seconds:
-    :return:
-    """
-    return (datetime.now(timezone(timedelta(hours=8)))
-            + timedelta(days=days, seconds=seconds, minutes=minutes, hours=hours))
+def now() -> datetime:
+    """获取当前时间，时区为东八区"""
+    return datetime.today()

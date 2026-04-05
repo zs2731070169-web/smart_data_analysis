@@ -1,9 +1,9 @@
 from langgraph.runtime import Runtime
 
 from conf.app_config import COLUMN_VALUE_INDEX
-from agent.context import EnvContext
+from agent.schema.context_schema import EnvContext
 from agent.node._common import expand_keywords
-from agent.state import OverallState
+from agent.schema.state_schema import OverallState
 from infra.log.logging import logger
 from utils.loader_utils import load_prompt
 
@@ -16,7 +16,7 @@ async def value_retrieval_node(state: OverallState, runtime: Runtime[EnvContext]
     :return:
     """
     writer = runtime.stream_writer
-    writer("开始值召回节点")
+    writer("开始执行值召回节点")
 
     # ============== 扩展表字段值召回的关键词 =================
 
@@ -42,4 +42,4 @@ async def value_retrieval_node(state: OverallState, runtime: Runtime[EnvContext]
 
     logger.info(f"召回的字段值: {unique_value_map.keys()}")
 
-    return {"value_list": unique_values}
+    return {"retrieval_value_list": unique_values}

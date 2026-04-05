@@ -1,4 +1,6 @@
-from sqlalchemy import Connection, text, quoted_name
+from typing import Sequence
+
+from sqlalchemy import Connection, text, quoted_name, RowMapping
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from infra.log.logging import logger
@@ -43,3 +45,34 @@ class DwHiveRepository:
             logger.info(f"获取表 {table_name} 字段 {column_name} 的值成功，共 {len(column_values)} 个值，offset={offset}")
 
         return column_values
+
+    def get_version(self):
+        """
+        查询hive数据库的版本和方言
+        :return:
+        """
+        result = self.dw_connect.execute(text("SELECT version()"))
+        return result.scalar()
+
+    def validate(self, hql: str):
+        """
+        使用执行计划检查hql语法是否正确
+        :param hql:
+        :return:
+        """
+        self.dw_connect.execute(text(f"EXPLAIN {hql}"))
+        logger.info("HQL 语法校验通过")
+
+    def execute_query(self, hql) -> Sequence[RowMapping]:
+        """
+        根据给定的hql进行查询所有结果
+        :param hql:
+        :return:
+        """
+        result = self.dw_connect.execute(text(hql))
+        return result.mappings().fetchmany(100)
+
+    def is_hs2(self):
+        """获取hive的环境是否是hs2"""
+        result = self.dw_connect.execute(text("SET hive.server2.thrift.port"))
+        return result.fetchone()[0]
