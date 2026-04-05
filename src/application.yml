@@ -49,7 +49,7 @@ es:
 llm:
   expand_keywords_llm:
     model_name: qwen-max
-    api_key: &dashscope_key sk-4b46af6488c04528a00c8035b25dae8a
+    api_key: &dashscope_key 填写你的api_key
     url: &dashscope_url https://dashscope.aliyuncs.com/compatible-mode/v1
   filter_llm:
     model_name: deepseek-v3.2
@@ -57,7 +57,7 @@ llm:
     url: *dashscope_url
   general_hql_llm:
     model_name: claude-haiku-4-5
-    api_key: &closeai_key sk-NZrstfdEC0rWPXH1Q1beo6ft4UElWp1OdWbMAR6DWE681Clh
+    api_key: &closeai_key 填写你的api_key
     url: &closeai_url https://api.openai-proxy.org/v1
   validate_hql_llm:
     model_name: claude-haiku-4-5
