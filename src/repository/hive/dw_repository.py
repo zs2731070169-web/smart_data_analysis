@@ -70,7 +70,7 @@ class DwHiveRepository:
         :return:
         """
         result = self.dw_connect.execute(text(hql))
-        return result.mappings().fetchmany(100)
+        return result.mappings().fetchmany()
 
     def is_hs2(self):
         """获取hive的环境是否是hs2"""

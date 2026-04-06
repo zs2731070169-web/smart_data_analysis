@@ -23,7 +23,7 @@ ALLOW_POS = (
 )
 
 
-def entity_extract(state: InputState, runtime: Runtime[EnvContext]) -> dict[str, list[str]]:
+def entity_extract_node(state: InputState, runtime: Runtime[EnvContext]) -> dict[str, list[str]]:
     """
     实体抽取节点
     :param state:
@@ -33,17 +33,18 @@ def entity_extract(state: InputState, runtime: Runtime[EnvContext]) -> dict[str,
     writer = runtime.stream_writer
     writer("开始执行实体抽取节点")
 
-    question = state['question']
+    try:
+        question = state['question']
 
-    # 提取实体
-    entities = jieba.analyse.extract_tags(question, allowPOS=ALLOW_POS)
+        # 提取实体
+        entities = jieba.analyse.extract_tags(question, allowPOS=ALLOW_POS)
+        entities.append(question)
 
-    # 添加问题，防止实体抽取遗漏
-    entities.append(question)
+        # 去除question和tags里的重复项
+        entities = list(set(entities))
+        logger.info(f"抽取到的实体: {entities}")
 
-    # 去除question和tags里的重复项
-    entities = list(set(entities))
-
-    logger.info(f"抽取到的实体: {entities}")
-
-    return {"entities": entities}
+        return {"entities": entities}
+    except Exception as e:
+        logger.error(f"实体抽取失败: {str(e)}")
+        raise Exception('实体抽取失败，请稍后重试或联系数据团队😿')

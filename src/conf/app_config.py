@@ -127,6 +127,13 @@ class ColumnCompleteLlm:
 
 
 @dataclass
+class ResultAnalyzeLlm:
+    model_name: str
+    api_key: str
+    url: str
+
+
+@dataclass
 class LLMConfig:
     expand_keywords_llm: ExpandKeywordsLlm
     filter_llm: FilterLlm
@@ -135,6 +142,7 @@ class LLMConfig:
     correct_hql_llm: CorrectHqlLlm
     judge_llm: JudgeLlm
     column_complete_llm: ColumnCompleteLlm
+    result_analyze_llm: ResultAnalyzeLlm
 
 
 # ============================== 总配置 ==============================
@@ -155,7 +163,6 @@ META_METRICS_COLLECTION = "meta_metrics_collection"
 
 # ============================== es索引 ==============================
 COLUMN_VALUE_INDEX = "column_value_index"
-
 
 # 连续查不到字段/指标的累计次数上限，超出后触发熔断降级
 MAX_UNFOUND_COUNT = 3

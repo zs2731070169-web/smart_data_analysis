@@ -1,15 +1,12 @@
 from pathlib import Path
-from typing import Type, TypeVar
 
 from omegaconf import OmegaConf
 
-T = TypeVar("T")
 
-
-def load_conf(schema_cls: Type[T], conf_path: Path) -> T:
+def load_conf[T](schema_cls: type[T], conf_path: Path) -> T:
     """
     加载指定路径下的配置文件，返回与 schema_cls 相同类型的实例
-    :param schema_cls: Type[T] 表示 schema_cls 参数接收的是一个类本
+    :param schema_cls: type[T] 表示 schema_cls 参数接收的是一个泛型类
     :param conf_path:
     :return:
     """

@@ -12,7 +12,7 @@ from conf.app_config import app_config, COLUMN_VALUE_INDEX, META_METRICS_COLLECT
 from conf.meta_config import MetaConfig, TableConfig, MetricConfig
 from infra.factory.repository_factory import Repositories
 from infra.log.logging import logger
-from infra.manager.embedding_client import embedding_manager
+from infra.manager.embedding_manager import embedding_manager
 from models.meta_models import TableInfo, ColumnInfo, MetricInfo
 from utils.loader_utils import load_conf
 

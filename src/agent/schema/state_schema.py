@@ -42,14 +42,10 @@ class InputState(TypedDict):
     question: str
 
 
-class OutputState(TypedDict):
-    """输出状态"""
-    output: list[dict[str, Any]] # 正常执行完以后的结构，json列表输出
-    answer: str  # 自然语言回答，用于拒答或空结果友好提示
-
-
-class OverallState(InputState, OutputState):
+class OverallState(InputState):
     """主状态"""
+    is_relevant: bool  # 意图识别结果
+
     entities: list[str]  # 用户查询抽取的实体列表
 
     retrieval_column_list: list[dict]  # 字段元数据列表，每个字段元数据包含字段名称、所属表、字段描述等信息

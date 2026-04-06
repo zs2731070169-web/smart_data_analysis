@@ -53,28 +53,33 @@ async def validate_hql_node(state: OverallState, runtime: Runtime[EnvContext]):
     db_metadata_text = build_db_metadata_text(state.get('expand_db_metadata'))
 
     # 使用大模型进行意图校验
-    prompt_template = PromptTemplate(
-        template=load_prompt("validate_hql.md"),
-        input_variables=['question', 'table_column_list', 'metric_list', 'datetime', 'db_metadata', 'hql']
-    )
-    chain = prompt_template | validate_hql_llm.with_structured_output(schema=ValidateResult, method='function_calling')
-    raw_output = await chain.ainvoke(
-        {
-            "question": state.get('question'),
-            "table_column_list": table_column_text,
-            "metric_list": metric_text,
-            "datetime": cur_datetime_info,
-            "db_metadata": db_metadata_text,
-            "hql": hql
-        }
-    )
+    try:
+        prompt_template = PromptTemplate(
+            template=load_prompt("validate_hql.md"),
+            input_variables=['question', 'table_column_list', 'metric_list', 'datetime', 'db_metadata', 'hql']
+        )
+        chain = prompt_template | validate_hql_llm.with_structured_output(schema=ValidateResult, method='function_calling')
+        raw_output = await chain.ainvoke(
+            {
+                "question": state.get('question'),
+                "table_column_list": table_column_text,
+                "metric_list": metric_text,
+                "datetime": cur_datetime_info,
+                "db_metadata": db_metadata_text,
+                "hql": hql
+            }
+        )
 
-    # 判断模型输出是否为真实错误
-    if raw_output.errors:
-        for index, error in enumerate(raw_output.errors, 1):
-            valid = await _judge_error_item(error)
-            validates += [error] if valid else []
-            logger.info(f"裁决错误项结果 {index}: {'真实错误' if valid else '幻觉输出'}")
+        # 判断模型输出是否为真实错误
+        if raw_output.errors:
+            for index, error in enumerate(raw_output.errors, 1):
+                valid = await _judge_error_item(error)
+                validates += [error] if valid else []
+                logger.info(f"裁决错误项结果 {index}: {'真实错误' if valid else '幻觉输出'}")
+
+    except Exception as e:
+        logger.error(f"HQL 语义校验失败: {str(e)}")
+        raise Exception('HQL 语义校验失败，请稍后重试或联系数据团队😿')
 
     # 根据条件解析为字典
     errors = []

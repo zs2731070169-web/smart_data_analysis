@@ -18,23 +18,28 @@ async def metrics_retrieval_node(state: OverallState, runtime: Runtime[EnvContex
     writer = runtime.stream_writer
     writer("开始执行指标召回节点")
 
-    # ============== 扩展指标召回的关键词 =================
+    try:
+        # ============== 扩展指标召回的关键词 =================
 
-    keywords = await expand_keywords(
-        state['question'],
-        state['entities'],
-        load_prompt("extend_keywords_for_metric_recall.md")
-    )
+        keywords = await expand_keywords(
+            state['question'],
+            state['entities'],
+            load_prompt("extend_keywords_for_metric_recall.md")
+        )
 
-    logger.info(f"扩展后的指标关键词: {keywords}")
+        logger.info(f"扩展后的指标关键词: {keywords}")
 
-    # ============== 从qdrant召回指标元数据 =================
+        # ============== 从qdrant召回指标元数据 =================
 
-    unique_metrics_list = await qdrant_retrieval(
-        collection_name=META_METRICS_COLLECTION,
-        keywords=keywords,
-        meta_qdrant_repository=runtime.context.get('repositories').meta_qdrant,
-        embedding_client=runtime.context.get('embedding_client')
-    )
+        unique_metrics_list = await qdrant_retrieval(
+            collection_name=META_METRICS_COLLECTION,
+            keywords=keywords,
+            meta_qdrant_repository=runtime.context.get('repositories').meta_qdrant,
+            embedding_client=runtime.context.get('embedding_client')
+        )
 
-    return {"retrieval_metrics_list": unique_metrics_list}
+        return {"retrieval_metrics_list": unique_metrics_list}
+
+    except Exception as e:
+        logger.error(f"指标召回失败: {str(e)}")
+        raise Exception('指标召回失败，请稍后重试或联系数据团队😿')

@@ -5,7 +5,8 @@ config:
 ---
 graph TD;
 	__start__([<p>__start__</p>]):::first
-	entity_extract(entity_extract)
+	intent_check_node(intent_check_node)
+	entity_extract_node(entity_extract_node)
 	column_retrieval_node(column_retrieval_node)
 	metrics_retrieval_node(metrics_retrieval_node)
 	value_retrieval_node(value_retrieval_node)
@@ -20,12 +21,14 @@ graph TD;
 	execute_hql_node(execute_hql_node)
 	fallback_node(fallback_node)
 	__end__([<p>__end__</p>]):::last
-	__start__ --> entity_extract;
+	__start__ --> intent_check_node;
+	intent_check_node -. &nbsp;entity_extract&nbsp; .-> entity_extract_node;
+	intent_check_node -. &nbsp;fallback&nbsp; .-> fallback_node;
+	entity_extract_node --> column_retrieval_node;
+	entity_extract_node --> metrics_retrieval_node;
+	entity_extract_node --> value_retrieval_node;
 	column_retrieval_node --> merge_node;
 	correct_hql_node --> validate_hql_node;
-	entity_extract --> column_retrieval_node;
-	entity_extract --> metrics_retrieval_node;
-	entity_extract --> value_retrieval_node;
 	expand_node --> generate_hql_node;
 	generate_hql_node --> validate_hql_node;
 	merge_node --> metric_filter_node;

@@ -19,15 +19,15 @@ async def fallback_node(state: OverallState, runtime: Runtime[EnvContext]):
     unfound_fields: list[str] = state.get('unfound_fields') or []
     correct_count: int = state.get('correct_count', 0)
 
-    if unfound_fields:
+    if not state.get("is_relevant", True):
+        answer = "您的问题与数据查询无关，我只能回答业务数据相关的问题，例如销售额、订单数、客户分析等。🤗"
+    elif unfound_fields:
         fields_str = "、".join(f"[{f}]" for f in unfound_fields)
-        answer = f"当前数据源不包含所需字段 {fields_str}，无法完成该查询"
+        answer = f"当前数据源不包含所需字段 {fields_str}，无法完成该查询 🤔"
     elif correct_count >= MAX_CORRECT_COUNT:
-        answer = f"HQL 经 {correct_count} 轮纠错后仍无法满足查询要求，无法完成该查询"
+        answer = f"HQL 经 {correct_count} 轮纠错后仍无法满足查询要求，无法完成该查询 😓"
     else:
-        answer = "无法完成该查询，请检查查询条件或联系数据团队"
+        answer = "无法完成该查询，请检查查询条件或联系数据团队 📞"
 
     logger.warning(f"触发熔断拒答：{answer}")
     writer(answer)
-    return {"answer": answer, "output": []}
-

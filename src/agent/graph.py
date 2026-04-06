@@ -5,12 +5,13 @@ from langgraph.graph import StateGraph
 
 from agent.node.column_retrieval_node import column_retrieval_node
 from agent.node.correct_hql_node import correct_hql_node
-from agent.node.entity_extract_node import entity_extract
+from agent.node.entity_extract_node import entity_extract_node
 from agent.node.execute_hql_node import execute_hql_node
 from agent.node.expand_node import expand_node
 from agent.node.fallback_node import fallback_node
 
 from agent.node.generate_hql_node import generate_hql_node
+from agent.node.intent_check_node import intent_check_node
 from agent.node.merge_node import merge_node
 from agent.node.metric_filter_node import metric_filter_node
 from agent.node.metrics_retrieval_node import metrics_retrieval_node
@@ -19,20 +20,21 @@ from agent.node.table_filter_node import table_filter_node
 from agent.node.validate_hql_node import validate_hql_node
 from agent.node.value_retrieval_node import value_retrieval_node
 from agent.schema.context_schema import EnvContext
-from agent.schema.state_schema import OverallState, InputState, OutputState
+from agent.schema.state_schema import OverallState, InputState
 from conf.app_config import MAX_UNFOUND_COUNT, MAX_CORRECT_COUNT
 from infra.factory.repository_factory import repository_factory
 from infra.log import task_id_context
-from infra.manager.embedding_client import embedding_manager
+from infra.manager.embedding_manager import embedding_manager
 
 # 创建图
 builder = StateGraph(
     input_schema=InputState,
-    output_schema=OutputState,
     state_schema=OverallState,
     context_schema=EnvContext)
 
-builder.add_node(node="entity_extract", action=entity_extract)
+
+builder.add_node(node="intent_check_node", action=intent_check_node)
+builder.add_node(node="entity_extract_node", action=entity_extract_node)
 builder.add_node(node="column_retrieval_node", action=column_retrieval_node)
 builder.add_node(node="metrics_retrieval_node", action=metrics_retrieval_node)
 builder.add_node(node="value_retrieval_node", action=value_retrieval_node)
@@ -47,10 +49,15 @@ builder.add_node(node="correct_hql_node", action=correct_hql_node)
 builder.add_node(node="execute_hql_node", action=execute_hql_node)
 builder.add_node(node="fallback_node", action=fallback_node)
 
-builder.add_edge(start_key=START, end_key="entity_extract")
-builder.add_edge(start_key="entity_extract", end_key="column_retrieval_node")
-builder.add_edge(start_key="entity_extract", end_key="metrics_retrieval_node")
-builder.add_edge(start_key="entity_extract", end_key="value_retrieval_node")
+builder.add_edge(start_key=START, end_key="intent_check_node")
+builder.add_conditional_edges(
+    source="intent_check_node",
+    path=lambda state: "entity_extract" if state.get("is_relevant") else "fallback",
+    path_map={"entity_extract": "entity_extract_node", "fallback": "fallback_node"},
+)
+builder.add_edge(start_key="entity_extract_node", end_key="column_retrieval_node")
+builder.add_edge(start_key="entity_extract_node", end_key="metrics_retrieval_node")
+builder.add_edge(start_key="entity_extract_node", end_key="value_retrieval_node")
 builder.add_edge(
     start_key=["column_retrieval_node", "metrics_retrieval_node", "value_retrieval_node"],
     end_key="merge_node")
@@ -302,7 +309,12 @@ async def run_benchmark():
         for idx, question in enumerate(suite, 1):
             task_id_context.set(uuid.uuid4().hex)
             print(f"[{idx:02d}/{len(suite)}] {question}")
-            final_state: dict = {}
+            # custom chunk 收集：dict 含 output 为查询结果，str 为各类文本消息
+            output: list[dict] = []
+            answer: str = ""
+            hql: str = ""
+            correct_count: int = 0
+            unfound_fields: list = []
             run_error = ""
             t0 = time.monotonic()
             try:
@@ -312,22 +324,32 @@ async def run_benchmark():
                             repositories=repositories,
                             embedding_client=embedding_manager.embedding_client,
                         ),
-                        stream_mode=["values"],
+                        stream_mode=["updates", "custom"],
                 ):
-                    final_state = chunk  # 每次覆盖，最终保留最后一个节点的完整状态
+                    if mode == "custom":
+                        # execute_hql_node 写入 {"output": [...]}
+                        if isinstance(chunk, dict) and "output" in chunk:
+                            output = chunk["output"]
+                        # fallback_node / execute_hql_node 写入字符串消息
+                        elif isinstance(chunk, str):
+                            answer = chunk
+                    elif mode == "updates":
+                        # 从状态更新中提取 hql / correct_count / unfound_fields
+                        for node_output in chunk.values():
+                            if isinstance(node_output, dict):
+                                if "hql" in node_output:
+                                    hql = node_output["hql"] or hql
+                                if "correct_count" in node_output:
+                                    correct_count = int(node_output["correct_count"] or 0)
+                                if "unfound_fields" in node_output:
+                                    unfound_fields = list(node_output["unfound_fields"] or [])
             except Exception as e:
                 run_error = str(e)
             duration_ms = (time.monotonic() - t0) * 1000
 
-            output = final_state.get("output") or []
-            answer = final_state.get("answer") or ""
-            hql = final_state.get("hql") or ""
-            correct_count = int(final_state.get("correct_count") or 0)
-            unfound_fields = list(final_state.get("unfound_fields") or [])
-
             success = bool(output)
             exec_error = "查询执行失败" in answer
-            empty_result = (not output) and (not exec_error) and (not answer or answer == "执行成功，已返回查询结果")
+            empty_result = (not output) and (not exec_error) and (not answer or "执行完毕" in answer)
             unfound_fb = "当前数据源不包含所需字段" in answer
             correct_fb = "轮纠错后仍无法满足" in answer
             other_fb = (not success) and (not exec_error) and (not empty_result) and (not unfound_fb) and (
@@ -421,6 +443,6 @@ async def run_benchmark():
 if __name__ == '__main__':
     import asyncio
 
-    # print(graph.get_graph().draw_mermaid())
+    print(graph.get_graph().draw_mermaid())
 
-    asyncio.run(run_benchmark())
+    # asyncio.run(run_benchmark())

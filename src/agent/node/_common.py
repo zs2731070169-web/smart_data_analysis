@@ -48,7 +48,7 @@ async def qdrant_retrieval(
     unique_column_info_map = {}
 
     # 向量化每一个keyword
-    embeddings: list[list[float]] = embedding_client.embed_documents(keywords)
+    embeddings: list[list[float]] = await embedding_client.aembed_documents(keywords)
 
     for embedding in embeddings:
         # 召回
