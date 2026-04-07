@@ -3,13 +3,13 @@ import uuid
 from langgraph.constants import START, END
 from langgraph.graph import StateGraph
 
+from agent.node.analyze_result_node import analyze_result_node
 from agent.node.column_retrieval_node import column_retrieval_node
 from agent.node.correct_hql_node import correct_hql_node
 from agent.node.entity_extract_node import entity_extract_node
 from agent.node.execute_hql_node import execute_hql_node
 from agent.node.expand_node import expand_node
 from agent.node.fallback_node import fallback_node
-
 from agent.node.generate_hql_node import generate_hql_node
 from agent.node.intent_check_node import intent_check_node
 from agent.node.merge_node import merge_node
@@ -32,7 +32,6 @@ builder = StateGraph(
     state_schema=OverallState,
     context_schema=EnvContext)
 
-
 builder.add_node(node="intent_check_node", action=intent_check_node)
 builder.add_node(node="entity_extract_node", action=entity_extract_node)
 builder.add_node(node="column_retrieval_node", action=column_retrieval_node)
@@ -47,6 +46,7 @@ builder.add_node(node="validate_hql_node", action=validate_hql_node)
 builder.add_node(node="missing_complete_node", action=missing_complete_node)
 builder.add_node(node="correct_hql_node", action=correct_hql_node)
 builder.add_node(node="execute_hql_node", action=execute_hql_node)
+builder.add_node(node="analyze_result_node", action=analyze_result_node)
 builder.add_node(node="fallback_node", action=fallback_node)
 
 builder.add_edge(start_key=START, end_key="intent_check_node")
@@ -65,7 +65,12 @@ builder.add_edge(start_key="merge_node", end_key="table_filter_node")
 builder.add_edge(start_key="merge_node", end_key="metric_filter_node")
 builder.add_edge(start_key=["table_filter_node", "metric_filter_node"], end_key="expand_node")
 builder.add_edge(start_key="expand_node", end_key="generate_hql_node")
-builder.add_edge(start_key="generate_hql_node", end_key="validate_hql_node")
+# generate_hql_node 判定数据表无法满足问题时，直接跳 fallback，避免无意义的校验/纠错循环
+builder.add_conditional_edges(
+    source="generate_hql_node",
+    path=lambda state: "fallback" if state.get("unable_to_answer_advice") else "validate_hql",
+    path_map={"validate_hql": "validate_hql_node", "fallback": "fallback_node"},
+)
 # 如果校验结果为空就执行hql，如果校验结果不为空但纠错轮次未达上限就进入补全节点，如果校验结果不为空且纠错轮次已达上限就进入兜底节点
 builder.add_conditional_edges(
     source="validate_hql_node",
@@ -87,7 +92,12 @@ builder.add_conditional_edges(
     path_map={"correct_hql": "correct_hql_node", "fallback": "fallback_node"}
 )
 builder.add_edge(start_key="correct_hql_node", end_key="validate_hql_node")
-builder.add_edge(start_key="execute_hql_node", end_key=END)
+builder.add_conditional_edges(
+    source="execute_hql_node",
+    path=lambda state: "analyze_result" if state.get("execute_result") else "fallback",
+    path_map={"analyze_result": "analyze_result_node", "fallback": "fallback_node"},
+)
+builder.add_edge(start_key="analyze_result_node", end_key=END)
 builder.add_edge(start_key="fallback_node", end_key=END)
 
 graph = builder.compile()
@@ -106,42 +116,43 @@ def build_test_suite1() -> list[str]:
     """
     return [
         # 前年 & YTD（2 条）
-        "查询前年的总订单数和总销量",                          # 前年，无维度
-        "查询今年年初至今的总销售额和购买客户数",              # YTD，GMV + CUSTOMER_COUNT
+        "查询前年的总订单数和总销量",  # 前年，无维度
+        "查询今年年初至今的总销售额和购买客户数",  # YTD，GMV + CUSTOMER_COUNT
 
         # 日均指标（2 条）
-        "统计去年各大区的日均销售额",                          # DAR by region
-        "计算去年各月的日均订单数并找出订单量最低的月份",      # DAO by month + 排序
+        "统计去年各大区的日均销售额",  # DAR by region
+        "计算去年各月的日均订单数并找出订单量最低的月份",  # DAO by month + 排序
 
         # 月度客单价 & 省份趋势 & 性别×地区（3 条）
-        "查询近12个月客单价最高和最低的月份",                  # RPC by month，极值
+        "查询近12个月客单价最高和最低的月份",  # RPC by month，极值
         "统计各省份近12个月的销售额趋势，找出增幅最大的省份",  # PROVINCE_GMV，近N个月 + 排序
-        "对比男女客户在华东地区的购买频次和销售额",            # PF + GMV，性别 × 地区
+        "对比男女客户在华东地区的购买频次和销售额",  # PF + GMV，性别 × 地区
 
         # 购买频次 & 新老客（2 条）
-        "对比不同会员等级的购买频次和日均订单数",              # PF + DAO by member_level
-        "查询新客户和复购客户在各大区的销售额分布",            # GMV by region + 新老客
+        "对比不同会员等级的购买频次和日均订单数",  # PF + DAO by member_level
+        "查询新客户和复购客户在各大区的销售额分布",  # GMV by region + 新老客
 
         # 品牌 × 地区 / 跨年同比（3 条）
-        "查询去年各品牌在不同大区的销售额排名",               # BRAND_REGION_GMV
-        "对比各品牌去年和前年的销售额变化",                   # BRAND_GMV，跨年同比
-        "查询华南地区销售额最高的品牌及其订单数",              # BRAND_GMV + BRAND_ORDERS，地区过滤
+        "查询去年各品牌在不同大区的销售额排名",  # BRAND_REGION_GMV
+        "对比各品牌去年和前年的销售额变化",  # BRAND_GMV，跨年同比
+        "查询华南地区销售额最高的品牌及其订单数",  # BRAND_GMV + BRAND_ORDERS，地区过滤
 
         # 性别 × 品类 / 会员 × 品类（2 条）
-        "统计男女客户在各品类的销售额分布",                   # GENDER_CATEGORY_GMV
-        "对比去年各会员等级在不同品类的客单价",               # RPC by member_level + category
+        "统计男女客户在各品类的销售额分布",  # GENDER_CATEGORY_GMV
+        "对比去年各会员等级在不同品类的客单价",  # RPC by member_level + category
 
         # 多维交叉（1 条）
-        "统计去年男女客户在各会员等级的分布及各自客单价",     # MEMBER + GENDER 多维
+        "统计去年男女客户在各会员等级的分布及各自客单价",  # MEMBER + GENDER 多维
 
         # 地区 × 近N月 / 复购趋势（2 条）
-        "统计近6个月华东地区各月的销售额和订单数",            # MONTHLY_GMV + MONTHLY_ORDERS，地区
-        "统计近12个月华北地区各月复购客户数的变化",           # REPURCHASE_COUNT by month，地区
+        "统计近6个月华东地区各月的销售额和订单数",  # MONTHLY_GMV + MONTHLY_ORDERS，地区
+        "统计近12个月华北地区各月复购客户数的变化",  # REPURCHASE_COUNT by month，地区
 
         # 季度 × 地区 × Top-N / 历史年 × 地区 × Top-N（2 条）
-        "统计今年Q1华南地区销量前5的商品品类",                # CATEGORY_QTY，季度 + 地区 + Top-N
-        "查询2024年各大区销售额最高的前3个品类",              # CATEGORY_GMV by region，历史年 + 地区 + Top-N
+        "统计今年Q1华南地区销量前5的商品品类",  # CATEGORY_QTY，季度 + 地区 + Top-N
+        "查询2024年各大区销售额最高的前3个品类",  # CATEGORY_GMV by region，历史年 + 地区 + Top-N
     ]
+
 
 def build_test_suite2() -> list[str]:
     return [
@@ -441,8 +452,6 @@ async def run_benchmark():
 
 
 if __name__ == '__main__':
-    import asyncio
-
     print(graph.get_graph().draw_mermaid())
 
     # asyncio.run(run_benchmark())

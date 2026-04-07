@@ -144,7 +144,8 @@ async def generate_hql(
         query: dict[str, Any],
         variables: list[str],
         system_prompt: str,
-        correct_hql_llm=None
+        correct_hql_llm=None,
+        user_prompt: str | None = None,
 ) -> str:
     """
     使用大模型生成hql
@@ -152,13 +153,19 @@ async def generate_hql(
     :param query:
     :param system_prompt:
     :param correct_hql_llm: 指定使用的 LLM 实例，默认使用 general_hql_llm
+    :param user_prompt: 可选的 user 消息模板；提供时使用 ChatPromptTemplate(system+user)，否则退化为单条 PromptTemplate
     :return:
     """
-    # 生成sql
-    prompt_template = PromptTemplate(
-        template=system_prompt,
-        input_variables=variables
-    )
+    if user_prompt:
+        prompt_template = ChatPromptTemplate(messages=[
+            ("system", system_prompt),
+            ("user", user_prompt),
+        ])
+    else:
+        prompt_template = PromptTemplate(
+            template=system_prompt,
+            input_variables=variables
+        )
     chain = prompt_template | (correct_hql_llm or general_hql_llm) | StrOutputParser()
     hql = await chain.ainvoke(query)
 

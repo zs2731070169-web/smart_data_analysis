@@ -15,3 +15,6 @@ wheels/
 
 /docker/
 /docker/hive/
+
+# 含敏感信息的配置文件（使用 application.yml.example 作为模板）
+/src/application.yml

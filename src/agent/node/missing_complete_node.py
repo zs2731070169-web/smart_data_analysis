@@ -95,11 +95,11 @@ async def missing_complete_node(state: OverallState, runtime: Runtime[EnvContext
         if llm_result and getattr(llm_result, 'is_missing', False):
             missing_list.extend(llm_result.missing_list)
 
-        unfound: list[str] = []
-
         # 如果字段缺失列表不为空，执行字段/指标补全
         if missing_list:
             logger.info(f"开始执行字段/指标补全，补全列表：{missing_list}")
+
+            unfound: list[str] = []
 
             # 收集字段名列表, 去除字段名中的表名前缀，如 fact_order.order_id → order_id
             column_names = []
@@ -154,16 +154,17 @@ async def missing_complete_node(state: OverallState, runtime: Runtime[EnvContext
                         for missing_metric in missing_metrics
                     ]
 
-        # 补全失败，无法找到字段/指标就累加失败次数和无效字段名
-        if unfound:
-            unfound_history = state.get('unfound_fields') or []
-            unfound_list = list(set(unfound_history + unfound))
-            unfound_count = state.get('unfound_count', 0) + 1
-            logger.warning(f"第 {unfound_count} 次查不到字段/指标 {unfound}，累计缺失列表：{unfound_list}")
-            return {
-                "unfound_fields": unfound_list,
-                "unfound_count": unfound_count,
-            }
+            # 补全失败，无法找到字段/指标就累加失败次数和无效字段名
+            if unfound:
+                unfound_history = state.get('unfound_fields') or []
+                # 告诉纠错模型是哪些字段/指标不存在
+                unfound_list = list(set(unfound_history + unfound))
+                unfound_count = state.get('unfound_count', 0) + 1
+                logger.warning(f"第 {unfound_count} 次查不到字段/指标 {unfound}，累计缺失列表：{unfound_list}")
+                return {
+                    "unfound_fields": unfound_list,
+                    "unfound_count": unfound_count,
+                }
 
         # 返回补充的字段列表或透传
         return {
@@ -173,7 +174,7 @@ async def missing_complete_node(state: OverallState, runtime: Runtime[EnvContext
 
     except Exception as e:
         logger.error(f"字段/指标补全失败: {str(e)}")
-        raise Exception('字段/指标补全失败，请稍后重试或联系数据团队😿')
+        raise Exception('字段/指标补全失败，请稍后重试或联系数据团队')
 
 
 def _extract_fields(error: str) -> list[str]:

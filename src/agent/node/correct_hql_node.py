@@ -96,4 +96,4 @@ async def correct_hql_node(state: OverallState, runtime: Runtime[EnvContext]):
 
     except Exception as e:
         logger.error(f"HQL 纠错失败: {str(e)}")
-        raise Exception('HQL 纠错失败，请稍后重试或联系数据团队😿')
+        raise Exception('HQL 纠错失败，请稍后重试或联系数据团队')

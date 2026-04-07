@@ -14,5 +14,4 @@ async def add_context_id(request: Request, call_next: Callable):
     :return:
     """
     task_id_context.set(uuid.uuid4().hex)
-    response = await call_next(request)
-    return response
+    return await call_next(request)

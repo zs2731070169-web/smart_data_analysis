@@ -169,14 +169,14 @@ MAX_UNFOUND_COUNT = 3
 
 # 字段补全节点指数退避初始等待时间（秒）
 MISSING_COMPLETE_BACKOFF_BASE = 1
-MISSING_COMPLETE_BACKOFF_MAX = 4
+MISSING_COMPLETE_BACKOFF_MAX = 2
 
 # 单次查询纠错轮次上限，超出后触发兜底拒答
 MAX_CORRECT_COUNT = 10
 
 # 纠错节点指数退避初始等待时间（秒）
 CORRECT_BACKOFF_BASE = 1
-CORRECT_BACKOFF_MAX = 4
+CORRECT_BACKOFF_MAX = 2
 
 # 加载配置内容，返回AppConfig实例
 app_config = load_conf(AppConfig, Path(__file__).parents[2] / 'src' / 'application.yml')

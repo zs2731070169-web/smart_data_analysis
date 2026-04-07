@@ -1,0 +1,81 @@
+logging:
+  file:
+    enable: true
+    level: INFO
+    path: logs
+    rotation: "10 MB"
+    retention: "7 days"
+  console:
+    enable: true
+    level: DEBUG
+
+db:
+  host: localhost
+  port: 3306
+  user: root
+  password: 123456
+  database: smart_data_analysis
+  logger: true
+  pool_size: 5
+  max_overflow: 5
+  pool_timeout: 60
+  pool_recycle_timeout: 3600
+
+dw:
+  host: localhost
+  port: 10000
+  user: hiveserver2
+  database: smart_data_analysis
+
+qdrant:
+  host: localhost
+  port: 6333
+  embedding_size: 1024
+
+embedding:
+  host: localhost
+  port: 8081
+  model: BAAI/bge-large-zh-v1.5
+
+
+es:
+  host: localhost
+  port: 9200
+  username: elastic
+  password: changeme
+  index_name: data_agent
+
+
+llm:
+  expand_keywords_llm:
+    model_name: qwen-max
+    api_key: &dashscope_key YOUR_DASHSCOPE_API_KEY
+    url: &dashscope_url https://dashscope.aliyuncs.com/compatible-mode/v1
+  filter_llm:
+    model_name: deepseek-v3.2
+    api_key: *dashscope_key
+    url: *dashscope_url
+  general_hql_llm:
+    model_name: qwen3-max
+    api_key: *dashscope_key
+    url: *dashscope_url
+  validate_hql_llm:
+    model_name: claude-sonnet-4-6
+    api_key: YOUR_OPENAI_PROXY_API_KEY
+    url: https://api.openai-proxy.org/v1
+  correct_hql_llm:
+    model_name: qwen3-max
+    api_key: *dashscope_key
+    url: *dashscope_url
+  judge_llm:
+    model_name: deepseek-v3.2
+    api_key: *dashscope_key
+    url: *dashscope_url
+  column_complete_llm:
+    model_name: deepseek-v3.2
+    api_key: *dashscope_key
+    url: *dashscope_url
+  result_analyze_llm:
+    model_name: deepseek-v3.2
+    api_key: *dashscope_key
+    url: *dashscope_url

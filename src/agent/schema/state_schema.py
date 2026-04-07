@@ -71,4 +71,8 @@ class OverallState(InputState):
     unfound_fields: list[str]  # 累计查不到的字段/指标名（用于拼装拒答消息）
     unfound_count: int          # 连续查不到字段/指标的累计次数（达到阈值时触发熔断）
 
+    unable_to_answer_advice: str  # generate_hql_node 判定无法回答时的建设性意见，非空则直接触发 fallback
+
+    execute_result: list[dict[str, Any]] # 执行节点执行hql的结果
+
 
