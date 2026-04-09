@@ -49,7 +49,7 @@ es:
 llm:
   expand_keywords_llm:
     model_name: qwen-max
-    api_key: &dashscope_key YOUR_DASHSCOPE_API_KEY
+    api_key: &dashscope_key YOUR_API_KEY
     url: &dashscope_url https://dashscope.aliyuncs.com/compatible-mode/v1
   filter_llm:
     model_name: deepseek-v3.2
@@ -60,9 +60,9 @@ llm:
     api_key: *dashscope_key
     url: *dashscope_url
   validate_hql_llm:
-    model_name: claude-sonnet-4-6
-    api_key: YOUR_OPENAI_PROXY_API_KEY
-    url: https://api.openai-proxy.org/v1
+    model_name: Pro/MiniMaxAI/MiniMax-M2.5
+    api_key: YOUR_API_KEY
+    url: https://api.siliconflow.cn/v1
   correct_hql_llm:
     model_name: qwen3-max
     api_key: *dashscope_key
