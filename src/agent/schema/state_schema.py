@@ -46,6 +46,8 @@ class OverallState(InputState):
     """主状态"""
     is_relevant: bool  # 意图识别结果
 
+    clarification_question: str  # 意图识别阶段需要向用户追问的问题（非空则终止 pipeline 等待用户补充）
+
     entities: list[str]  # 用户查询抽取的实体列表
 
     retrieval_column_list: list[dict]  # 字段元数据列表，每个字段元数据包含字段名称、所属表、字段描述等信息

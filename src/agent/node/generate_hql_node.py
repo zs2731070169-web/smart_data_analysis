@@ -37,7 +37,6 @@ async def generate_hql_node(state: OverallState, runtime: Runtime[EnvContext]):
                 "datetime": cur_datetime_info,
                 "db_metadata": db_metadata_text
             },
-            variables=['question', 'table_column_list', 'metric_list', 'datetime', 'db_metadata'],
             system_prompt=load_prompt("generate_hql_system.md"),
             user_prompt=load_prompt("generate_hql_user.md"),
         )

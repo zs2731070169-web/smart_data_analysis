@@ -44,14 +44,12 @@ async def correct_hql_node(state: OverallState, runtime: Runtime[EnvContext]):
         validates = state.get('validates', [])
         if not validates:
             return "无校验问题"
-        lines = []
-        for i, validate in enumerate(validates, 1):
-            lines.append(f"{i}. 错误：{validate.get('error')} | 建议：{validate.get('suggestion')}")
+        lines = [f"{i}. 错误：{validate.get('error')}" for i, validate in enumerate(validates, 1)]
         validates_text = "\n".join(lines).strip()
 
         # 历史纠错记录
         fix_history = state.get('fix_history', [])
-        fix_history_text = "\n\n---\n\n".join(fix_history).rstrip()
+        fix_history_text = "\n\n---\n\n".join(fix_history[-2:]).rstrip()
 
         # 数据源中查不到的字段/指标
         unfound_fields = state.get('unfound_fields') or []
@@ -69,21 +67,17 @@ async def correct_hql_node(state: OverallState, runtime: Runtime[EnvContext]):
                 "fix_history": fix_history_text,
                 "unfound_fields": unfound_text,
             },
-            variables=['question', 'table_column_list', 'metric_list', 'datetime', 'db_metadata', 'hql', 'validates',
-                       'fix_history', 'unfound_fields'],
-            system_prompt=load_prompt("correct_hql.md"),
+            system_prompt=load_prompt("correct_hql_system.md"),
+            user_prompt=load_prompt("correct_hql_user.md"),
             correct_hql_llm=correct_hql_llm
         )
 
         # 添加历史轨迹（一轮一条，因果顺序：校验原因 → 修复结果）
-        errors_text = "\n".join(
-            f"  - 错误：{validate.get('error')} | 建议：{validate.get('suggestion')}"
-            for validate in validates
-        )
+        errors_text = "\n".join(f"  - 错误：{validate.get('error')}" for validate in validates)
         fix_history.append((
             f"第{len(fix_history) + 1}轮：针对以下校验问题尝试修复\n"
             f"{errors_text}\n"
-            f"修复后的 HQL：{hql}"
+            f"修复后的 HQL：{hql}>-"
         ))
 
         logger.info(f"纠错后的SQL: {hql}")

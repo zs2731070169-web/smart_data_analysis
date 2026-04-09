@@ -4,6 +4,7 @@ from langgraph.constants import START, END
 from langgraph.graph import StateGraph
 
 from agent.node.analyze_result_node import analyze_result_node
+from agent.node.clarify_node import clarify_node
 from agent.node.column_retrieval_node import column_retrieval_node
 from agent.node.correct_hql_node import correct_hql_node
 from agent.node.entity_extract_node import entity_extract_node
@@ -33,6 +34,7 @@ builder = StateGraph(
     context_schema=EnvContext)
 
 builder.add_node(node="intent_check_node", action=intent_check_node)
+builder.add_node(node="clarify_node", action=clarify_node)
 builder.add_node(node="entity_extract_node", action=entity_extract_node)
 builder.add_node(node="column_retrieval_node", action=column_retrieval_node)
 builder.add_node(node="metrics_retrieval_node", action=metrics_retrieval_node)
@@ -52,8 +54,16 @@ builder.add_node(node="fallback_node", action=fallback_node)
 builder.add_edge(start_key=START, end_key="intent_check_node")
 builder.add_conditional_edges(
     source="intent_check_node",
-    path=lambda state: "entity_extract" if state.get("is_relevant") else "fallback",
-    path_map={"entity_extract": "entity_extract_node", "fallback": "fallback_node"},
+    path=lambda state: (
+        "clarify" if state.get("clarification_question")
+        else "entity_extract" if state.get("is_relevant")
+        else "fallback"
+    ),
+    path_map={
+        "clarify": "clarify_node",
+        "entity_extract": "entity_extract_node",
+        "fallback": "fallback_node",
+    },
 )
 builder.add_edge(start_key="entity_extract_node", end_key="column_retrieval_node")
 builder.add_edge(start_key="entity_extract_node", end_key="metrics_retrieval_node")

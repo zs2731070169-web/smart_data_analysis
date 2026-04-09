@@ -4,11 +4,35 @@ from typing import Literal
 from json_repair import repair_json
 from pydantic import BaseModel, Field, field_validator
 
+from build.lib.agent.schema.TableColumnInfo import SelectedTable
 from infra.log.logging import logger
 from utils.text_utils import clean_code_block
 
 
-class SelectedTable(BaseModel):
+class IntentCheckResult(BaseModel):
+    """意图识别结果"""
+    is_relevant: bool = Field(
+        description="True 表示该问题属于本系统可处理的数据查询；False 表示与数据查询无关"
+    )
+    needs_clarification: bool = Field(
+        default=False,
+        description=(
+            "True 表示问题与数据查询相关，但存在关键歧义，需向用户追问后才能准确执行；"
+            "False 表示问题已足够明确或无需追问。"
+            "仅当 is_relevant=True 时本字段才有意义。"
+        )
+    )
+    clarification_question: str = Field(
+        default="",
+        description=(
+            "当 needs_clarification=True 时，向用户提出的追问内容。"
+            "须简洁、具体，直接点出不确定的维度或条件，并给出 2~4 个常见选项供用户参考。"
+            "当 needs_clarification=False 时，本字段为空字符串。"
+        )
+    )
+
+
+
     """单张被选中的表及其字段"""
     table_name: str = Field(description="表名")
     columns: list[str] = Field(description="该表中被选中的字段名列表")
@@ -38,7 +62,6 @@ class ErrorItem(BaseModel):
     )
     error: str = Field(
         description="错误描述，采用'预期 vs 实际 vs 差异'三段论：1.错误维度；2.预期逻辑（含具体日期推算）；3.HQL实际逻辑；4.业务差异后果")
-    suggestion: str = Field(description="明确的 HQL 修正片段")
 
 
 class ValidateResult(BaseModel):

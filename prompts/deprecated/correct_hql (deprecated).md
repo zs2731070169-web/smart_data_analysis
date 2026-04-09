@@ -93,6 +93,24 @@
 
 ---
 
+## ⚠️ Hive 语法强制规范
+
+纠错时必须主动检查以下 Hive 特有限制，**这些是 LLM 最容易忽视的死循环根源**：
+
+| 规范 | 正确写法 | 错误写法 |
+|------|---------|---------|
+| 中文或特殊字符列别名必须加反引号 | `` COUNT(x) AS `订单数` `` | `COUNT(x) AS 订单数` |
+| Hive 保留字（date/year/month/day/count/value/key等）用作别名必须加反引号 | `` expr AS `date` `` | `expr AS date` |
+| HAVING 子句必须使用完整聚合表达式，不能引用 SELECT 别名 | `HAVING COUNT(order_id) > 1` | `HAVING 订单数 > 1` |
+| 整数除整数结果为整数（截断），需显式转换 | `CAST(a AS DOUBLE) / b` | `a / b`（结果可能为 0） |
+| DATEDIFF 参数顺序为 (较晚日期, 较早日期) | `DATEDIFF('2025-04-08', '2025-01-01')` | `DATEDIFF('2025-01-01', '2025-04-08')` |
+| 窗口函数不支持 COUNT(DISTINCT x) OVER(...) | 改用子查询先去重再聚合 | `COUNT(DISTINCT x) OVER(...)` |
+| LIMIT 不能用于子查询内部 | 改用 `ROW_NUMBER() OVER(...)` 过滤行号 | 子查询内写 `LIMIT n` |
+
+> ⚠️ 若报错信息指向 `cannot recognize input near 'AS'`，**第一反应必须是检查所有列别名是否包含中文、特殊字符或保留字，并统一加反引号**，而不是修改运算符或类型转换。
+
+---
+
 ## 🚫 禁止事项
 
 | 禁止行为          | 说明                                                         |

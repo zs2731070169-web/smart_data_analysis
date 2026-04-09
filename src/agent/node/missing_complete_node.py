@@ -52,10 +52,12 @@ async def missing_complete_node(state: OverallState, runtime: Runtime[EnvContext
         filter_metrics_info_list: list[MetricState] = state.get('filter_metrics_info_list')
 
         # 分类收集hive语法校验和LLM校验抛出的错误
+        # 通过 error 文本中是否含 Hive 编译器特征字符串来区分来源
         hive_errors = []
         llm_errors = []
         for validate in context_missing_validates:
-            if validate.get('suggestion') == 'HQL语法错误，请进一步审查和修正HQL':
+            error_text = validate.get('error', '')
+            if 'errorCode=' in error_text or 'Invalid column reference' in error_text or 'Invalid table alias or column reference' in error_text:
                 hive_errors.append(validate)
             else:
                 llm_errors.append(validate)
@@ -72,10 +74,7 @@ async def missing_complete_node(state: OverallState, runtime: Runtime[EnvContext
         # LLM校验抛出的上下文缺失，使用LLM提取缺失字段/指标
         llm_result = None
         if llm_errors:
-            errors_text = "\n".join(
-                f"  - 错误：{validate.get('error')} | 建议：{validate.get('suggestion')}"
-                for validate in llm_errors
-            )
+            errors_text = "\n".join(f"  - 错误：{validate.get('error')}" for validate in llm_errors)
             table_column_text = build_table_column_text(state.get('merge_table_info_list'))
             metric_text = build_metric_text(state.get('merge_metrics_info_list'))
 

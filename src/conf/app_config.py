@@ -176,7 +176,7 @@ MAX_CORRECT_COUNT = 10
 
 # 纠错节点指数退避初始等待时间（秒）
 CORRECT_BACKOFF_BASE = 1
-CORRECT_BACKOFF_MAX = 2
+CORRECT_BACKOFF_MAX = 4
 
 # 加载配置内容，返回AppConfig实例
 app_config = load_conf(AppConfig, Path(__file__).parents[2] / 'src' / 'application.yml')

@@ -142,10 +142,10 @@ def build_db_metadata_text(db_meta) -> str:
 
 async def generate_hql(
         query: dict[str, Any],
-        variables: list[str],
         system_prompt: str,
-        correct_hql_llm=None,
         user_prompt: str | None = None,
+        variables: list[str]=None,
+        correct_hql_llm=None
 ) -> str:
     """
     使用大模型生成hql

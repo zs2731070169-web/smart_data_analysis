@@ -52,10 +52,12 @@ column_complete_llm = ChatOpenAI(
     model=app_config.llm.column_complete_llm.model_name,
     base_url=app_config.llm.column_complete_llm.url,
     api_key=app_config.llm.column_complete_llm.api_key,
+    temperature=0,
 )
 
 result_analyze_llm = ChatOpenAI(
     model=app_config.llm.result_analyze_llm.model_name,
     base_url=app_config.llm.result_analyze_llm.url,
     api_key=app_config.llm.result_analyze_llm.api_key,
+    temperature=0,
 )
