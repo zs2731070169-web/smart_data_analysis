@@ -3,29 +3,26 @@ import uuid
 from langgraph.constants import START, END
 from langgraph.graph import StateGraph
 
-from agent.node.analyze_result_node import analyze_result_node
-from agent.node.clarify_node import clarify_node
+from agent.node.generate_result_node import generate_result_node
 from agent.node.column_retrieval_node import column_retrieval_node
-from agent.node.correct_hql_node import correct_hql_node
 from agent.node.entity_extract_node import entity_extract_node
 from agent.node.execute_hql_node import execute_hql_node
 from agent.node.expand_node import expand_node
-from agent.node.fallback_node import fallback_node
 from agent.node.generate_hql_node import generate_hql_node
 from agent.node.intent_check_node import intent_check_node
 from agent.node.merge_node import merge_node
 from agent.node.metric_filter_node import metric_filter_node
 from agent.node.metrics_retrieval_node import metrics_retrieval_node
-from agent.node.missing_complete_node import missing_complete_node
 from agent.node.table_filter_node import table_filter_node
 from agent.node.validate_hql_node import validate_hql_node
 from agent.node.value_retrieval_node import value_retrieval_node
 from agent.schema.context_schema import EnvContext
-from agent.schema.state_schema import OverallState, InputState
-from conf.app_config import MAX_UNFOUND_COUNT, MAX_CORRECT_COUNT
+from agent.schema.state_schema import OverallState, InputState, ValidateState
 from infra.factory.repository_factory import repository_factory
 from infra.log import task_id_context
 from infra.manager.embedding_manager import embedding_manager
+
+from infra.log.logging import logger
 
 # 创建图
 builder = StateGraph(
@@ -34,7 +31,6 @@ builder = StateGraph(
     context_schema=EnvContext)
 
 builder.add_node(node="intent_check_node", action=intent_check_node)
-builder.add_node(node="clarify_node", action=clarify_node)
 builder.add_node(node="entity_extract_node", action=entity_extract_node)
 builder.add_node(node="column_retrieval_node", action=column_retrieval_node)
 builder.add_node(node="metrics_retrieval_node", action=metrics_retrieval_node)
@@ -45,25 +41,30 @@ builder.add_node(node="metric_filter_node", action=metric_filter_node)
 builder.add_node(node="expand_node", action=expand_node)
 builder.add_node(node="generate_hql_node", action=generate_hql_node)
 builder.add_node(node="validate_hql_node", action=validate_hql_node)
-builder.add_node(node="missing_complete_node", action=missing_complete_node)
-builder.add_node(node="correct_hql_node", action=correct_hql_node)
 builder.add_node(node="execute_hql_node", action=execute_hql_node)
-builder.add_node(node="analyze_result_node", action=analyze_result_node)
-builder.add_node(node="fallback_node", action=fallback_node)
+builder.add_node(node="generate_result_node", action=generate_result_node)
 
 builder.add_edge(start_key=START, end_key="intent_check_node")
+
+
+def route_intent_check(state: OverallState) -> str:
+    """
+    意图识别后的路由：
+    - 无关问题 → 直接结束（已在节点内推送拒答）
+    - 需用户补充 → 直接结束（已推送追问，等待用户重新发起）
+    - 相关且明确 → 继续抽实体进入主流程
+    """
+    if not state.get("is_relevant"):
+        return "end"
+    if state.get("clarification_question"):
+        return "end"
+    return "continue"
+
+
 builder.add_conditional_edges(
     source="intent_check_node",
-    path=lambda state: (
-        "clarify" if state.get("clarification_question")
-        else "entity_extract" if state.get("is_relevant")
-        else "fallback"
-    ),
-    path_map={
-        "clarify": "clarify_node",
-        "entity_extract": "entity_extract_node",
-        "fallback": "fallback_node",
-    },
+    path=route_intent_check,
+    path_map={"continue": "entity_extract_node", "end": END},
 )
 builder.add_edge(start_key="entity_extract_node", end_key="column_retrieval_node")
 builder.add_edge(start_key="entity_extract_node", end_key="metrics_retrieval_node")
@@ -75,40 +76,37 @@ builder.add_edge(start_key="merge_node", end_key="table_filter_node")
 builder.add_edge(start_key="merge_node", end_key="metric_filter_node")
 builder.add_edge(start_key=["table_filter_node", "metric_filter_node"], end_key="expand_node")
 builder.add_edge(start_key="expand_node", end_key="generate_hql_node")
-# generate_hql_node 判定数据表无法满足问题时，直接跳 fallback，避免无意义的校验/纠错循环
-builder.add_conditional_edges(
-    source="generate_hql_node",
-    path=lambda state: "fallback" if state.get("unable_to_answer_advice") else "validate_hql",
-    path_map={"validate_hql": "validate_hql_node", "fallback": "fallback_node"},
-)
-# 如果校验结果为空就执行hql，如果校验结果不为空但纠错轮次未达上限就进入补全节点，如果校验结果不为空且纠错轮次已达上限就进入兜底节点
+builder.add_edge(start_key="generate_hql_node", end_key="validate_hql_node")
+
+# generate→validate 纠错回路的最大次数
+MAX_CORRECT_LOOPS = 15
+
+
+def route_validate_hql(state: OverallState) -> str:
+    validates: list[ValidateState] = state.get("validates") or []
+    has_error = any(not validate.is_valid for validate in validates)
+    if not has_error:
+        return "execute_hql"
+    correct_count = state.get("correct_count", 0) or 0
+    if correct_count >= MAX_CORRECT_LOOPS:
+        logger.warning(
+            f"HQL 纠错回路达到上限 {MAX_CORRECT_LOOPS} 次，仍未通过校验，直接结束流程"
+        )
+        return "end"
+    return "generate_hql"
+
+
 builder.add_conditional_edges(
     source="validate_hql_node",
-    path=lambda state: (
-        "execute_hql" if not state.get("validates")
-        else "fallback" if state.get("correct_count", 0) >= MAX_CORRECT_COUNT
-        else "missing_complete"
-    ),
+    path=route_validate_hql,
     path_map={
         "execute_hql": "execute_hql_node",
-        "missing_complete": "missing_complete_node",
-        "fallback": "fallback_node",
-    }
+        "generate_hql": "generate_hql_node",
+        "end": END,
+    },
 )
-# 查不到字段时继续尝试纠错，累计失败达 MAX_UNFOUND_COUNT 次后才触发降级
-builder.add_conditional_edges(
-    source="missing_complete_node",
-    path=lambda state: "fallback" if state.get("unfound_count", 0) >= MAX_UNFOUND_COUNT else "correct_hql",
-    path_map={"correct_hql": "correct_hql_node", "fallback": "fallback_node"}
-)
-builder.add_edge(start_key="correct_hql_node", end_key="validate_hql_node")
-builder.add_conditional_edges(
-    source="execute_hql_node",
-    path=lambda state: "analyze_result" if state.get("execute_result") else "fallback",
-    path_map={"analyze_result": "analyze_result_node", "fallback": "fallback_node"},
-)
-builder.add_edge(start_key="analyze_result_node", end_key=END)
-builder.add_edge(start_key="fallback_node", end_key=END)
+builder.add_edge(start_key="execute_hql_node", end_key="generate_result_node")
+builder.add_edge(start_key="generate_result_node", end_key=END)
 
 graph = builder.compile()
 
@@ -282,186 +280,5 @@ def build_test_suite2() -> list[str]:
     ]
 
 
-async def run_benchmark():
-    """
-    执行基准测试并输出多维度质量报告。
-
-    统计指标说明
-    ────────────────────────────────────────────────────
-    成功率          output 非空，HQL 执行有结果
-    空结果率        HQL 执行成功但查询结果为空
-    失败率          触发熔断拒答（fallback_node）
-      ├ 字段缺失降级  unfound_fields 非空导致熔断
-      └ 纠错超限降级  correct_count 达上限导致熔断
-    执行异常率      execute_hql_node 抛出异常
-    一次通过率      correct_count == 0 且执行成功
-    重试成功率      correct_count > 0 且执行成功
-    平均纠错轮次    所有用例的 correct_count 均值
-    ────────────────────────────────────────────────────
-    """
-    import time
-    import dataclasses
-
-    @dataclasses.dataclass
-    class CaseResult:
-        question: str
-        success: bool  # output 非空
-        empty_result: bool  # 执行成功但无数据
-        exec_error: bool  # execute_hql_node 异常
-        fallback: bool  # 触发熔断
-        unfound_fallback: bool  # 字段找不到触发熔断
-        correct_limit_fallback: bool  # 纠错超限触发熔断
-        other_fallback: bool  # 其他原因熔断
-        correct_count: int
-        unfound_fields: list
-        hql: str
-        answer: str
-        duration_ms: float
-        run_error: str  # 节点/框架运行时异常
-
-    suite = build_test_suite1()
-    results: list[CaseResult] = []
-
-    print(f"\n{'=' * 70}")
-    print(f"  基准测试开始，共 {len(suite)} 条用例")
-    print(f"{'=' * 70}\n")
-
-    async with repository_factory as repositories:
-        for idx, question in enumerate(suite, 1):
-            task_id_context.set(uuid.uuid4().hex)
-            print(f"[{idx:02d}/{len(suite)}] {question}")
-            # custom chunk 收集：dict 含 output 为查询结果，str 为各类文本消息
-            output: list[dict] = []
-            answer: str = ""
-            hql: str = ""
-            correct_count: int = 0
-            unfound_fields: list = []
-            run_error = ""
-            t0 = time.monotonic()
-            try:
-                async for mode, chunk in graph.astream(
-                        input=InputState(question=question),
-                        context=EnvContext(
-                            repositories=repositories,
-                            embedding_client=embedding_manager.embedding_client,
-                        ),
-                        stream_mode=["updates", "custom"],
-                ):
-                    if mode == "custom":
-                        # execute_hql_node 写入 {"output": [...]}
-                        if isinstance(chunk, dict) and "output" in chunk:
-                            output = chunk["output"]
-                        # fallback_node / execute_hql_node 写入字符串消息
-                        elif isinstance(chunk, str):
-                            answer = chunk
-                    elif mode == "updates":
-                        # 从状态更新中提取 hql / correct_count / unfound_fields
-                        for node_output in chunk.values():
-                            if isinstance(node_output, dict):
-                                if "hql" in node_output:
-                                    hql = node_output["hql"] or hql
-                                if "correct_count" in node_output:
-                                    correct_count = int(node_output["correct_count"] or 0)
-                                if "unfound_fields" in node_output:
-                                    unfound_fields = list(node_output["unfound_fields"] or [])
-            except Exception as e:
-                run_error = str(e)
-            duration_ms = (time.monotonic() - t0) * 1000
-
-            success = bool(output)
-            exec_error = "查询执行失败" in answer
-            empty_result = (not output) and (not exec_error) and (not answer or "执行完毕" in answer)
-            unfound_fb = "当前数据源不包含所需字段" in answer
-            correct_fb = "轮纠错后仍无法满足" in answer
-            other_fb = (not success) and (not exec_error) and (not empty_result) and (not unfound_fb) and (
-                not correct_fb) and bool(answer)
-            fallback = unfound_fb or correct_fb or other_fb
-
-            status = "✓ 成功" if success else (
-                "○ 空结果" if empty_result else ("✗ 失败" if fallback else ("! 异常" if exec_error else "? 未知")))
-            print(f"       状态={status}  纠错={correct_count}轮  耗时={duration_ms:.0f}ms")
-            if run_error:
-                print(f"       运行异常: {run_error}")
-
-            results.append(CaseResult(
-                question=question,
-                success=success,
-                empty_result=empty_result,
-                exec_error=exec_error,
-                fallback=fallback,
-                unfound_fallback=unfound_fb,
-                correct_limit_fallback=correct_fb,
-                other_fallback=other_fb,
-                correct_count=correct_count,
-                unfound_fields=unfound_fields,
-                hql=hql,
-                answer=answer,
-                duration_ms=duration_ms,
-                run_error=run_error,
-            ))
-
-    # ── 汇总报告 ──────────────────────────────────────────────────────
-    n = len(results)
-    n_success = sum(r.success for r in results)
-    n_empty = sum(r.empty_result for r in results)
-    n_exec_error = sum(r.exec_error for r in results)
-    n_fallback = sum(r.fallback for r in results)
-    n_unfound_fb = sum(r.unfound_fallback for r in results)
-    n_correct_fb = sum(r.correct_limit_fallback for r in results)
-    n_other_fb = sum(r.other_fallback for r in results)
-    n_run_error = sum(bool(r.run_error) for r in results)
-    n_first_pass = sum(r.success and r.correct_count == 0 for r in results)
-    n_retry_success = sum(r.success and r.correct_count > 0 for r in results)
-    avg_correct = sum(r.correct_count for r in results) / n
-    avg_duration = sum(r.duration_ms for r in results) / n
-    max_duration = max(r.duration_ms for r in results)
-    min_duration = min(r.duration_ms for r in results)
-
-    def pct(k):
-        return f"{k / n * 100:.1f}%"
-
-    print(f"\n{'=' * 70}")
-    print(f"  基准测试报告  （共 {n} 条用例）")
-    print(f"{'=' * 70}")
-    print(f"  {'指标':<20} {'数量':>6}  {'占比':>8}")
-    print(f"  {'-' * 38}")
-    print(f"  {'成功率':<20} {n_success:>6}  {pct(n_success):>8}")
-    print(f"  {'  一次通过率':<20} {n_first_pass:>6}  {pct(n_first_pass):>8}")
-    print(f"  {'  重试成功率':<20} {n_retry_success:>6}  {pct(n_retry_success):>8}")
-    print(f"  {'空结果率':<20} {n_empty:>6}  {pct(n_empty):>8}")
-    print(f"  {'失败率（熔断）':<20} {n_fallback:>6}  {pct(n_fallback):>8}")
-    print(f"  {'  字段缺失降级':<20} {n_unfound_fb:>6}  {pct(n_unfound_fb):>8}")
-    print(f"  {'  纠错超限降级':<20} {n_correct_fb:>6}  {pct(n_correct_fb):>8}")
-    print(f"  {'  其他降级':<20} {n_other_fb:>6}  {pct(n_other_fb):>8}")
-    print(f"  {'执行异常率':<20} {n_exec_error:>6}  {pct(n_exec_error):>8}")
-    print(f"  {'框架运行异常':<20} {n_run_error:>6}  {pct(n_run_error):>8}")
-    print(f"  {'-' * 38}")
-    print(f"  {'平均纠错轮次':<20} {avg_correct:>6.2f}")
-    print(f"  {'平均耗时(ms)':<20} {avg_duration:>6.0f}")
-    print(f"  {'最大耗时(ms)':<20} {max_duration:>6.0f}")
-    print(f"  {'最小耗时(ms)':<20} {min_duration:>6.0f}")
-    print(f"{'=' * 70}")
-
-    # ── 失败 / 异常用例明细 ──────────────────────────────────────────
-    failed = [r for r in results if not r.success or r.run_error]
-    if failed:
-        print(f"\n  失败 / 异常用例明细（{len(failed)} 条）：")
-        for r in failed:
-            tag = []
-            if r.unfound_fallback:      tag.append(f"字段缺失{r.unfound_fields}")
-            if r.correct_limit_fallback: tag.append(f"纠错超限({r.correct_count}轮)")
-            if r.exec_error:            tag.append("执行异常")
-            if r.other_fallback:        tag.append("其他熔断")
-            if r.run_error:             tag.append(f"框架异常:{r.run_error}")
-            print(f"  ✗ {r.question}")
-            print(f"    原因: {' | '.join(tag)}")
-            if r.hql:
-                hql_preview = r.hql.replace('\n', ' ')[:120]
-                print(f"    HQL : {hql_preview}{'...' if len(r.hql) > 120 else ''}")
-    print(f"{'=' * 70}\n")
-
-
 if __name__ == '__main__':
     print(graph.get_graph().draw_mermaid())
-
-    # asyncio.run(run_benchmark())

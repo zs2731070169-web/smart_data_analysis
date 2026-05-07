@@ -3,13 +3,13 @@ from langchain_core.prompts import ChatPromptTemplate
 from langgraph.runtime import Runtime
 
 from agent.schema.context_schema import EnvContext
-from agent.schema.state_schema import OverallState
-from infra.client.llm_client import result_analyze_llm
+from agent.schema.state_schema import OverallState, ExecuteState
+from infra.client import result_analyze_llm
 from infra.log.logging import logger
 from utils.loader_utils import load_prompt
 
 
-async def analyze_result_node(state: OverallState, runtime: Runtime[EnvContext]):
+async def generate_result_node(state: OverallState, runtime: Runtime[EnvContext]):
     """
     对hql生成的结果进行解析
     :param state:
@@ -20,29 +20,35 @@ async def analyze_result_node(state: OverallState, runtime: Runtime[EnvContext])
     writer("开始解析最终结果")
 
     try:
-        execute_result = state.get('execute_result') or []
+        execute_result: ExecuteState | None = state.get('execute_result')
+        if not execute_result or not execute_result.rows:
+            writer("暂无查询结果")
+            return
 
-        # 只取1行给 LLM 进行字段名翻译
-        sample = execute_result[:1]
+        columns = execute_result.columns
+
+        # 只取 1 行给 LLM 做字段名翻译
+        sample_row_dict = dict(zip(columns, execute_result.rows[0]))
         prompt_template = ChatPromptTemplate(messages=[
             ("system", load_prompt("analyze_result.md")),
             ("user", "{result}")
         ])
         chain = prompt_template | result_analyze_llm | JsonOutputParser()
-        translated_list = await chain.ainvoke({"result": sample})
+        translated_list = await chain.ainvoke({"result": [sample_row_dict]})
 
-        # 从翻译样本中提取字段名映射，应用到全量结果
+        # 从翻译样本中提取字段名映射，应用到全量行数据
         final_result = []
         if translated_list and isinstance(translated_list, list) and len(translated_list) > 0:
-            # 得到原始key到翻译名称的映射
-            translate_mapping = {origin: translated for origin, translated in
-                                 zip(sample[0].keys(), translated_list[0].keys())}
-            for row in execute_result:
-                # 逐行翻译
+            translate_mapping = {
+                origin: translated
+                for origin, translated in zip(columns, translated_list[0].keys())
+            }
+            for row_values in execute_result.rows:
+                row_dict = dict(zip(columns, row_values))
                 final_result.append(
                     {
                         translate_mapping.get(key, key): value if value else 0
-                        for key, value in row.items()
+                        for key, value in row_dict.items()
                     }
                 )
         else:
