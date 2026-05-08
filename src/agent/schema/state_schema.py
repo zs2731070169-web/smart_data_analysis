@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import TypedDict, Any
 
+from enums.types import ErrorTypes
+
 
 @dataclass
 class SysDateTime:
@@ -44,6 +46,7 @@ class MetricState:
 class ValidateState:
     error: str  # 校验错误
     suggestion: str  # 校验建议
+    error_type: ErrorTypes  # 错误类别
     is_valid: bool = False  # 校验是否通过
 
 

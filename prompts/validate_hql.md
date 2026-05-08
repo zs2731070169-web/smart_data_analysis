@@ -126,6 +126,7 @@
 |------|------|
 | `error` | 必须采用**【错误维度】预期逻辑 → 实际逻辑 → 差异后果**的三段论描述。包含：1) 错误维度（时间/指标/意图/字段/语法）；2) 预期逻辑（含具体推算）；3) HQL 实际逻辑；4) 业务差异后果 |
 | `suggestion` | 给出**具体、可直接落地**的修正建议，包含明确的字段、值、子句或表达式（不要只说"请修改"） |
+| `error_type` | **错误类别枚举**，下游路由依据。**取值必须为以下五者之一（小写英文字符串）**，否则输出会被拒绝：<br>• `time` — 时间范围 / 季度 / YTD / 近 N 月等时间口径错误（对应"时间范围语义"维度）<br>• `metric` — 指标聚合方式 / 过滤规则 / 时间口径与定义不符（对应"指标口径"维度）<br>• `intent` — 用户意图未被完整表达（指标 / 维度 / 过滤条件 / Top-N 缺漏，对应"意图匹配"维度）<br>• `field` — 字段或表不在召回范围内、被臆造（对应"字段真实性"维度）<br>• `syntax` — 方言、关键字、引号、JOIN、只读合规等（对应"语法规范"维度）<br>选择规则：当一条错误同时跨多个维度时，按 `field > time > metric > intent > syntax` 优先级取最严重的一个；不要拆成多条同因错误。 |
 | `is_valid` | **该维度是否校验通过**：通过填 `true`，未通过填 `false`。下游仅对 `is_valid=false` 的项触发纠错。在写完 `error` / `suggestion` 后请再核一遍——若复核认定本条实为误报（如属于"语义匹配原则"或"等价写法不得误判为错"豁免范围），可将 `is_valid` 置为 `true`，避免无谓回流。 |
 
 ### ⚠️ 引号规范
@@ -145,6 +146,7 @@
     {{
       "error": "【时间范围偏差】预期逻辑：用户要求'近 12 个月'，按当前时间 2026-04-03 应为 2025-04-01 ~ 2026-03-31（完整自然月）。实际逻辑：HQL 使用 d.date_id BETWEEN 20250403 AND 20260403。差异后果：缺失 2025 年 4 月前 2 天数据，并多计入 2026 年 4 月不完整数据。",
       "suggestion": "将过滤条件改为 d.date_id BETWEEN 20250401 AND 20260331。",
+      "error_type": "time",
       "is_valid": false
     }}
   ]
@@ -158,6 +160,7 @@
     {{
       "error": "【指标口径偏差】预期逻辑：客单价分母需为去重客户数 COUNT(DISTINCT user_id)。实际逻辑：HQL 使用 COUNT(user_id)。差异后果：未去重会导致重复下单的客户被多次计算，客单价被低估。",
       "suggestion": "将分母改为 COUNT(DISTINCT user_id)。",
+      "error_type": "metric",
       "is_valid": false
     }}
   ]
@@ -171,6 +174,7 @@
     {{
       "error": "【字段真实性】预期逻辑：HQL 引用了字段 member_level，应存在于 dim_customer 表。实际逻辑：当前召回字段列表中未包含该字段。差异后果：HQL 无法执行。",
       "suggestion": "使用召回范围内语义等价的字段（如 customer_level）替代，或在召回阶段补全 member_level 元数据。",
+      "error_type": "field",
       "is_valid": false
     }}
   ]
@@ -189,11 +193,13 @@
     {{
       "error": "【时间范围偏差】预期逻辑：用户要求'近 12 个月'，按当前时间 2026-04-03 应为 2025-04-01 ~ 2026-03-31。实际逻辑：HQL 使用 d.date_id >= 20250403 AND d.date_id <= 20260403。差异后果：缺失 2025 年 4 月前 2 天数据，并多计入 2026 年 4 月不完整数据。",
       "suggestion": "将过滤条件改为 d.date_id BETWEEN 20250401 AND 20260331。",
+      "error_type": "time",
       "is_valid": false
     }},
     {{
       "error": "【指标口径偏差】预期逻辑：客单价分母需为 COUNT(DISTINCT user_id)。实际逻辑：HQL 使用 COUNT(user_id)。差异后果：客单价被低估。",
       "suggestion": "将分母改为 COUNT(DISTINCT user_id)。",
+      "error_type": "metric",
       "is_valid": false
     }}
   ]

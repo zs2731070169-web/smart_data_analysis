@@ -2,6 +2,7 @@ import json
 
 from pydantic import BaseModel, Field, field_validator
 
+from enums.types import ErrorTypes
 from utils.text_utils import clean_block
 
 
@@ -61,9 +62,10 @@ class ValidateErrorItem(BaseModel):
         description="针对该错误的具体可落地修正建议，需包含明确的字段、值或表达式"
     )
     is_valid: bool = Field(
-        description=(
-            "是否校验通过，通过返回True，不通过返回False，后续处理将根据此字段进行过滤"
-        )
+        description="是否校验通过，通过返回True，不通过返回False，后续处理将根据此字段进行过滤"
+    )
+    error_type: ErrorTypes = Field(
+        description="错误类别，取值必须为 time / metric / intent / field / syntax 之一"
     )
 
 

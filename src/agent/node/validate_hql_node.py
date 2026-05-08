@@ -8,6 +8,7 @@ from agent.node._common import build_table_column_text, build_metric_text, build
 from agent.schema.context_schema import EnvContext
 from agent.schema.llm_schema import ValidateResult
 from agent.schema.state_schema import OverallState, ValidateState
+from enums.types import ErrorTypes
 from infra.client import validate_hql_llm
 from infra.log.logging import logger
 from utils.loader_utils import load_prompt
@@ -38,6 +39,7 @@ async def validate_hql_node(state: OverallState, runtime: Runtime[EnvContext]):
             ValidateState(
                 error=f"【语法规范】HQL 基础语法校验未通过：{error_str}",
                 suggestion="请根据数据库方言修正语法错误后重试",
+                error_type=ErrorTypes.SYNTAX,
                 is_valid=False,
             )
         ]
@@ -72,15 +74,18 @@ async def validate_hql_node(state: OverallState, runtime: Runtime[EnvContext]):
             }
         )
 
-        llm_with_structured_output = validate_hql_llm.with_structured_output(schema=ValidateResult, method='function_calling')
+        llm_with_structured_output = validate_hql_llm.with_structured_output(schema=ValidateResult,
+                                                                             method='function_calling')
 
         raw_output: ValidateResult = await llm_with_structured_output.ainvoke(input=prompt)
 
         validates += [
-            ValidateState(error=item.error, suggestion=item.suggestion, is_valid=item.is_valid)
+            ValidateState(error=item.error, suggestion=item.suggestion, error_type=item.error_type,
+                          is_valid=item.is_valid)
             for item in raw_output.errors
-            if item.is_valid is False
+            if not item.is_valid
         ]
+
 
     except Exception as e:
         logger.error(f"HQL 语义校验失败: {str(e)}")
