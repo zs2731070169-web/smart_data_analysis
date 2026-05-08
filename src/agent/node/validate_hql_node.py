@@ -35,14 +35,14 @@ async def validate_hql_node(state: OverallState, runtime: Runtime[EnvContext]):
     except Exception as e:
         error_str = str(e)
         logger.warning(f"HQL 基础语法校验失败: {error_str}")
-        validates += [
+        return {"validates": [
             ValidateState(
                 error=f"【语法规范】HQL 基础语法校验未通过：{error_str}",
                 suggestion="请根据数据库方言修正语法错误后重试",
                 error_type=ErrorTypes.SYNTAX,
                 is_valid=False,
             )
-        ]
+        ]}
 
     # 构建过滤后的表字段文本
     table_column_text = build_table_column_text(state.get('filter_table_info_list', []))
