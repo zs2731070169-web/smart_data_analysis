@@ -1,4 +1,4 @@
-def clean_code_block(text: str) -> str:
+def clean_block(text: str) -> str:
     """去掉文本里的代码块包裹"""
     import re
     text = text.strip()

@@ -109,11 +109,12 @@ async def merge_node(state: OverallState, runtime: Runtime[EnvContext]):
                     if foreign_key and foreign_key.name not in column_name_list:
                         table_column_state_list.append(_convert_to_table_column_state(foreign_key))
             # 构建表状态信息
-            table_state = TableState()
-            table_state.name = table_info.name
-            table_state.role = table_info.role
-            table_state.description = table_info.description
-            table_state.columns = table_column_state_list
+            table_state = TableState(
+                name=table_info.name,
+                description=table_info.description,
+                role=table_info.role,
+                columns=table_column_state_list,
+            )
             # 添加到返回列表
             table_info_list.append(table_state)
 

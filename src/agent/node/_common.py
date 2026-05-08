@@ -1,14 +1,13 @@
-from typing import Type, TypeVar, Any
+from typing import Type, TypeVar
 
-from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from qdrant_client.models import QueryResponse
 
-from infra.client.llm_client import expand_keywords_llm, filter_llm, general_hql_llm
+from infra.client import expand_keywords_llm, filter_llm
 from infra.log.logging import logger
 from repository.qdrant.meta_repository import MetaQdrantRepository
-from utils.text_utils import clean_code_block, extract_hql
 
 
 async def expand_keywords(question: str, entities: list[str], system_prompt: str) -> list[str]:
@@ -138,41 +137,3 @@ def build_db_metadata_text(db_meta) -> str:
         f"- **数据库版本**：{db_meta.version}",
         f"- **数据库方言**：{db_meta.dialect}",
     ])
-
-
-async def generate_hql(
-        query: dict[str, Any],
-        system_prompt: str,
-        user_prompt: str | None = None,
-        variables: list[str]=None,
-        correct_hql_llm=None
-) -> str:
-    """
-    使用大模型生成hql
-    :param variables:
-    :param query:
-    :param system_prompt:
-    :param correct_hql_llm: 指定使用的 LLM 实例，默认使用 general_hql_llm
-    :param user_prompt: 可选的 user 消息模板；提供时使用 ChatPromptTemplate(system+user)，否则退化为单条 PromptTemplate
-    :return:
-    """
-    if user_prompt:
-        prompt_template = ChatPromptTemplate(messages=[
-            ("system", system_prompt),
-            ("user", user_prompt),
-        ])
-    else:
-        prompt_template = PromptTemplate(
-            template=system_prompt,
-            input_variables=variables
-        )
-    chain = prompt_template | (correct_hql_llm or general_hql_llm) | StrOutputParser()
-    hql = await chain.ainvoke(query)
-
-    # 去掉 ``` 代码块包裹
-    hql = clean_code_block(hql)
-    # 若模型输出了分析文本 + HQL 的混合内容，只保留合法 HQL
-    hql = extract_hql(hql)
-
-    return hql
-

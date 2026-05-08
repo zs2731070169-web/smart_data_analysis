@@ -5,7 +5,7 @@ from decimal import Decimal
 from langgraph.runtime import Runtime
 
 from agent.schema.context_schema import EnvContext
-from agent.schema.state_schema import OverallState
+from agent.schema.state_schema import OverallState, ExecuteState
 from infra.log.logging import logger
 
 
@@ -22,18 +22,18 @@ async def execute_hql_node(state: OverallState, runtime: Runtime[EnvContext]):
     try:
         dw_repository = runtime.context.get('repositories').dw
         hql = state.get('hql', "").strip()
+        empty_result = ExecuteState(columns=[], rows=[], row_count=0)
         if not hql:
-            return {"execute_result": []}
+            return {"execute_result": empty_result}
 
         rows = await asyncio.to_thread(dw_repository.execute_query, hql)
 
         if not rows:
-            return {"execute_result": []}
+            return {"execute_result": empty_result}
 
-        execute_result = [
-            {col: _normalize(val) for col, val in row.items()}
-            for row in rows
-        ]
+        columns = list(rows[0].keys())
+        data = [[_normalize(row.get(col)) for col in columns] for row in rows]
+        execute_result = ExecuteState(columns=columns, rows=data, row_count=len(data))
 
         logger.info(f"HQL 执行结果: {execute_result}")
 

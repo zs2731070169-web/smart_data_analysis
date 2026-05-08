@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import TypedDict, Any
 
+from enums.types import ErrorTypes
+
 
 @dataclass
 class SysDateTime:
@@ -13,6 +15,7 @@ class DbMeta:
     version: str  # 版本号
     dialect: str  # 方言
 
+
 @dataclass
 class TableColumnState:
     name: str  # 字段名
@@ -23,11 +26,13 @@ class TableColumnState:
     alias: list[str]  # 字段别称
 
 
+@dataclass
 class TableState:
     name: str  # 表名
     description: str  # 描述信息
     role: str  # 表类型
     columns: list[TableColumnState]  # 字段列表
+
 
 @dataclass
 class MetricState:
@@ -37,6 +42,22 @@ class MetricState:
     alias: list[str]  # 指标别称列表
 
 
+@dataclass
+class ValidateState:
+    error: str  # 校验错误
+    suggestion: str  # 校验建议
+    error_type: ErrorTypes  # 错误类别
+    is_valid: bool = False  # 校验是否通过
+
+
+@dataclass
+class ExecuteState:
+    """HQL 执行结果"""
+    columns: list[str]  # 列名顺序
+    rows: list[list[Any]]  # 行数据，每行与 columns 一一对应
+    row_count: int = 0  # 行数
+
+
 class InputState(TypedDict):
     """输入状态"""
     question: str
@@ -44,9 +65,8 @@ class InputState(TypedDict):
 
 class OverallState(InputState):
     """主状态"""
-    is_relevant: bool  # 意图识别结果
-
-    clarification_question: str  # 意图识别阶段需要向用户追问的问题（非空则终止 pipeline 等待用户补充）
+    is_relevant: bool  # 意图识别结果：True=与数据查询相关，False=无关将被拒答
+    clarification_question: str  # 需要向用户追问的内容；非空则终止 pipeline 等待用户补充
 
     entities: list[str]  # 用户查询抽取的实体列表
 
@@ -65,16 +85,7 @@ class OverallState(InputState):
 
     hql: str  # 生成的hql
 
-    validates: list[dict[str, str]]  # hql校验列表（错误信息和优化建议）
+    validates: list[ValidateState]  # hql校验列表
+    correct_count: int  # 已发生的 generate→validate 纠错回路次数
 
-    fix_history: list[str]  # 纠错记录
-    correct_count: int  # 纠错次数
-
-    unfound_fields: list[str]  # 累计查不到的字段/指标名（用于拼装拒答消息）
-    unfound_count: int          # 连续查不到字段/指标的累计次数（达到阈值时触发熔断）
-
-    unable_to_answer_advice: str  # generate_hql_node 判定无法回答时的建设性意见，非空则直接触发 fallback
-
-    execute_result: list[dict[str, Any]] # 执行节点执行hql的结果
-
-
+    execute_result: ExecuteState  # 执行节点执行hql的结果
