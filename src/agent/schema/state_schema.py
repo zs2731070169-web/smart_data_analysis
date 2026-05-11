@@ -1,5 +1,8 @@
 from dataclasses import dataclass
-from typing import TypedDict, Any
+from typing import TypedDict, Any, List, Annotated
+
+from langchain_core.messages import AnyMessage
+from langgraph.graph import add_messages
 
 from enums.types import ErrorTypes
 
@@ -61,12 +64,15 @@ class ExecuteState:
 class InputState(TypedDict):
     """输入状态"""
     question: str
+    # 对话历史, add_messages会自动把节点返回的的messages字典转Message对象并进行追加
+    messages: Annotated[List[AnyMessage], add_messages]
 
 
 class OverallState(InputState):
     """主状态"""
     is_relevant: bool  # 意图识别结果：True=与数据查询相关，False=无关将被拒答
     clarification_question: str  # 需要向用户追问的内容；非空则终止 pipeline 等待用户补充
+    standalone_question: str  # 由意图节点结合历史改写出的自包含问题；下游节点优先使用
 
     entities: list[str]  # 用户查询抽取的实体列表
 

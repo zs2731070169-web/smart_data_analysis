@@ -6,8 +6,19 @@ from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from qdrant_client.models import QueryResponse
 
 from infra.client import expand_keywords_llm, filter_llm
+from infra.error import LLMServiceError
 from infra.log.logging import logger
 from repository.qdrant.meta_repository import MetaQdrantRepository
+from utils.llm_retry_utils import acall_with_retry
+
+
+def rewrite_question(state) -> str:
+    """
+    取下游召回/过滤/生成节点应使用的问题文本：
+    优先使用 intent_check_node 改写出的自包含问题 standalone_question；
+    若不存在（例如 LLM 降级或字段为空），回退到用户原始 question。
+    """
+    return state.get('standalone_question') or state.get('question') or ''
 
 
 async def expand_keywords(question: str, entities: list[str], system_prompt: str) -> list[str]:
@@ -23,7 +34,17 @@ async def expand_keywords(question: str, entities: list[str], system_prompt: str
         ("user", "用户问题\n{question}")
     ])
     chain = prompt_template | expand_keywords_llm | JsonOutputParser()
-    keywords = await chain.ainvoke({"question": question})
+    try:
+        keywords = await acall_with_retry(
+            lambda: chain.ainvoke({"question": question}),
+            op_name="expand_keywords",
+        )
+    except LLMServiceError as e:
+        # 降级：关键词扩展失败时仅用已抽取实体进行召回，避免拖垮整条流水线
+        logger.warning(
+            f"关键词扩展 LLM 失败降级为仅使用实体: reason={e.classified.reason.value}"
+        )
+        keywords = []
 
     unique_keywords = list(set(entities + keywords))
 
@@ -84,7 +105,10 @@ async def filter_columns_or_metrics(
         ("user", "用户问题\n{question}\n\n上下文信息\n{context}")
     ])
     chain = prompt_template | filter_llm.with_structured_output(schema_cls, method='function_calling')
-    llm_output = await chain.ainvoke(query)
+    llm_output = await acall_with_retry(
+        lambda: chain.ainvoke(query),
+        op_name="filter",
+    )
     return llm_output
 
 

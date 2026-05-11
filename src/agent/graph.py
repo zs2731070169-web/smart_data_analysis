@@ -1,3 +1,4 @@
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.constants import START, END
 from langgraph.graph import StateGraph
 
@@ -102,7 +103,7 @@ builder.add_conditional_edges(
 builder.add_edge(start_key="execute_hql_node", end_key="generate_result_node")
 builder.add_edge(start_key="generate_result_node", end_key=END)
 
-graph = builder.compile()
+graph = builder.compile(checkpointer=InMemorySaver())
 
 if __name__ == '__main__':
     print(graph.get_graph().draw_mermaid())

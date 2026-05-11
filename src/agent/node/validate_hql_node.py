@@ -4,13 +4,15 @@ from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langgraph.runtime import Runtime
 
-from agent.node._common import build_table_column_text, build_metric_text, build_datetime_text, build_db_metadata_text
+from agent.node._common import build_table_column_text, build_metric_text, build_datetime_text, build_db_metadata_text, rewrite_question
 from agent.schema.context_schema import EnvContext
 from agent.schema.llm_schema import ValidateResult
 from agent.schema.state_schema import OverallState, ValidateState
 from enums.types import ErrorTypes
 from infra.client import validate_hql_llm
+from infra.error import LLMServiceError
 from infra.log.logging import logger
+from utils.llm_retry_utils import acall_with_retry
 from utils.loader_utils import load_prompt
 
 
@@ -54,42 +56,45 @@ async def validate_hql_node(state: OverallState, runtime: Runtime[EnvContext]):
     cur_datetime_info = build_datetime_text(state.get('expand_datetime'))
     db_metadata_text = build_db_metadata_text(state.get('expand_db_metadata'))
 
-    # 使用大模型进行意图校验
-    try:
-        prompt_template = ChatPromptTemplate(
-            messages=[
-                {'role': 'system', 'content': load_prompt('validate_hql.md')},
-                {'role': 'user',
-                 'content': 'question: {question}\ntable_column_list: {table_column_list}\nmetric_list: {metric_list}\ndatetime: {datetime}\ndb_metadata: {db_metadata}\nhql: {hql}'}
-            ]
-        )
-        prompt = prompt_template.invoke(
-            {
-                "table_column_list": table_column_text,
-                "metric_list": metric_text,
-                "datetime": cur_datetime_info,
-                "db_metadata": db_metadata_text,
-                "hql": hql,
-                "question": state.get('question'),
-            }
-        )
-
-        llm_with_structured_output = validate_hql_llm.with_structured_output(schema=ValidateResult,
-                                                                             method='function_calling')
-
-        raw_output: ValidateResult = await llm_with_structured_output.ainvoke(input=prompt)
-
-        validates += [
-            ValidateState(error=item.error, suggestion=item.suggestion, error_type=item.error_type,
-                          is_valid=item.is_valid)
-            for item in raw_output.errors
-            if not item.is_valid
+    # 构建 prompt（纯计算）
+    prompt_template = ChatPromptTemplate(
+        messages=[
+            {'role': 'system', 'content': load_prompt('validate_hql.md')},
+            {'role': 'user',
+             'content': 'question: {question}\ntable_column_list: {table_column_list}\nmetric_list: {metric_list}\ndatetime: {datetime}\ndb_metadata: {db_metadata}\nhql: {hql}'}
         ]
+    )
+    prompt = prompt_template.invoke({
+        "table_column_list": table_column_text,
+        "metric_list": metric_text,
+        "datetime": cur_datetime_info,
+        "db_metadata": db_metadata_text,
+        "hql": hql,
+        "question": rewrite_question(state),
+    })
+    llm_with_structured_output = validate_hql_llm.with_structured_output(
+        schema=ValidateResult, method='function_calling'
+    )
 
+    # 仅包 LLM 调用：失败时降级放行（语法已过 → execute_hql 实际执行兜底）
+    try:
+        raw_output: ValidateResult = await acall_with_retry(
+            lambda: llm_with_structured_output.ainvoke(input=prompt),
+            op_name="validate_hql",
+        )
+    except LLMServiceError as e:
+        logger.warning(
+            f"HQL 语义校验 LLM 失败，放行已通过语法校验的 HQL: "
+            f"reason={e.classified.reason.value} status={e.classified.status_code}"
+        )
+        return {"validates": []}
 
-    except Exception as e:
-        logger.error(f"HQL 语义校验失败: {str(e)}")
-        raise Exception('HQL 语义校验失败，请稍后重试或联系数据团队')
+    validates += [
+        ValidateState(error=item.error, suggestion=item.suggestion,
+                      error_type=item.error_type, is_valid=item.is_valid)
+        for item in raw_output.errors
+        if not item.is_valid
+    ]
 
     # 打印 HQL 校验结果汇总
     if not validates:

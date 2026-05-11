@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends
 from starlette.responses import StreamingResponse
 
@@ -12,12 +14,12 @@ router = APIRouter(tags=["chat"])
 async def stream_chat(chat_request: ChatRequest, chat_service: ChatService = Depends(get_services)) -> StreamingResponse:
     """
     处理用户发起的对话
-    :param chat_request:
-    :param chat_service:
-    :return:
     """
-    chunk = chat_service.stream_chat(chat_request.question)
+    if not chat_request.session:
+        chat_request.session = uuid.uuid4().hex
+    chunk = chat_service.stream_chat(chat_request)
     return StreamingResponse(
         content=chunk,
-        media_type="text/event-stream"
+        media_type="text/event-stream",
+        headers={"X-Session-Id": chat_request.session},
     )

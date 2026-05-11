@@ -34,6 +34,15 @@ class IntentCheckResult(BaseModel):
             "is_relevant=True 时为空字符串。"
         )
     )
+    standalone_question: str = Field(
+        default="",
+        description=(
+            "在『相关且明确』场景下，结合历史对话把当前问题改写为自包含的完整问题："
+            "补齐被省略的实体/时间窗/维度/口径，消解『那/再/继续/上面的』等指代；"
+            "若当前问题本身已经自包含，原样返回当前问题。"
+            "在『无关』或『需追问』场景下，返回空字符串。"
+        )
+    )
 
 
 class SelectedTable(BaseModel):
